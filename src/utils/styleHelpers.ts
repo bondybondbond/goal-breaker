@@ -1,1 +1,67 @@
-import { LevelStyle, Goal, LevelStats } from "../types/goal.types"; // Level styling system - borders only, intensity increases with level export const getLevelStyle = (level: number, completed: boolean): LevelStyle => { const levelStyles = [ { border: "border-yellow-400", borderWidth: "border-4", color: "text-yellow-600" }, // Ultimate goal { border: "border-blue-300", borderWidth: "border-2", color: "text-blue-500" }, { border: "border-purple-400", borderWidth: "border-[3px]", color: "text-purple-600" }, { border: "border-green-400", borderWidth: "border-[3px]", color: "text-green-600" }, { border: "border-orange-400", borderWidth: "border-[4px]", color: "text-orange-600" }, { border: "border-pink-400", borderWidth: "border-[4px]", color: "text-pink-600" }, { border: "border-red-400", borderWidth: "border-[4px]", color: "text-red-600" }, { border: "border-indigo-500", borderWidth: "border-[5px]", color: "text-indigo-700" } ]; const style = levelStyles[Math.min(level, levelStyles.length - 1)]; if (completed) { return { border: "border-green-500", borderWidth: style.borderWidth, bg: "bg-green-100", color: "text-green-800" }; } return { border: style.border, borderWidth: style.borderWidth, bg: "bg-white", color: style.color }; }; export const getGoalStyle = (goal: Goal, isPanning: boolean, isDragged: boolean): string => { const levelStyle = getLevelStyle(goal.level, goal.completed); const baseStyle = "absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] select-none"; const cursorStyle = isPanning ? "cursor-grab" : (goal.isEditing ? "cursor-text" : "cursor-move"); return `${baseStyle} ${levelStyle.bg} ${levelStyle.border} ${levelStyle.borderWidth} ${cursorStyle}`; }; export const getLevelStats = (level: number, goals: Goal[]): LevelStats => { const levelGoals = goals.filter(g => g.level === level); const completed = levelGoals.filter(g => g.completed).length; return { total: levelGoals.length, completed }; }; export const getLevelLabel = (level: number): string => { if (level === 0) return "?? Ultimate Goal"; const labels = ["?? Strategy", "?? Tactics", "? Actions", "?? Tasks", "? Steps", "?? Details", "?? Micro"]; return labels[level - 1] || `?? Level ${level}`; };
+import { LevelStyle, Goal, LevelStats } from "../types/goal.types";
+
+// Level styling system - borders only, intensity increases with level
+export const getLevelStyle = (level: number, completed: boolean): LevelStyle => {
+  const levelStyles = [
+    { border: "border-yellow-400", borderWidth: "border-4", color: "text-yellow-600" }, // Ultimate goal
+    { border: "border-blue-300", borderWidth: "border-2", color: "text-blue-500" },
+    { border: "border-purple-400", borderWidth: "border-[3px]", color: "text-purple-600" },
+    { border: "border-green-400", borderWidth: "border-[3px]", color: "text-green-600" },
+    { border: "border-orange-400", borderWidth: "border-[4px]", color: "text-orange-600" },
+    { border: "border-pink-400", borderWidth: "border-[4px]", color: "text-pink-600" },
+    { border: "border-red-400", borderWidth: "border-[4px]", color: "text-red-600" },
+    { border: "border-indigo-500", borderWidth: "border-[5px]", color: "text-indigo-700" }
+  ];
+
+  const style = levelStyles[Math.min(level, levelStyles.length - 1)];
+
+  if (completed) {
+    return {
+      border: "border-green-400",
+      borderWidth: style.borderWidth,
+      bg: "bg-green-100",
+      color: "text-green-700"
+    };
+  }
+
+  return {
+    border: style.border,
+    borderWidth: style.borderWidth,
+    bg: "bg-white",
+    color: style.color
+  };
+};
+
+export const getGoalStyle = (goal: Goal, isPanning: boolean, isDragged: boolean): string => {
+  const levelStyle = getLevelStyle(goal.level, goal.completed);
+  const baseStyle = "absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] select-none";
+  const cursorStyle = isPanning ? "cursor-grab" : (goal.isEditing ? "cursor-text" : "cursor-move");
+  
+  return `${baseStyle} ${levelStyle.bg} ${levelStyle.border} ${levelStyle.borderWidth} ${cursorStyle}`;
+};
+
+export const getLevelStats = (level: number, goals: Goal[]): LevelStats => {
+  const levelGoals = goals.filter(g => g.level === level);
+  const completed = levelGoals.filter(g => g.completed).length;
+  
+  return {
+    total: levelGoals.length,
+    completed
+  };
+};
+
+export const getLevelLabel = (level: number): string => {
+  if (level === 0) return "🎯 Ultimate Goal";
+  
+  const labels = [
+    "🗺️ Strategy", 
+    "⚡ Tactics", 
+    "🎬 Actions", 
+    "📋 Tasks", 
+    "👣 Steps", 
+    "🔍 Details", 
+    "⚙️ Micro"
+  ];
+  
+  return labels[level - 1] || `📍 Level ${level}`;
+};

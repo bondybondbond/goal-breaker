@@ -1,10 +1,10 @@
 import React from 'react';
-import FluidGoalBreakdown from './components/GoalBreakdown';
+import GoalBreaker from './components/GoalBreakdown';
 
 function App() {
   return (
     <div className="App">
-      <FluidGoalBreakdown />
+      <GoalBreaker />
     </div>
   );
 }

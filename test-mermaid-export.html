@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mermaid Export Test</title>
+    <script type="module">
+        // Test data structure similar to what the app uses
+        const testGoals = [
+            {
+                id: 1,
+                text: "Launch New Mobile App",
+                completed: false,
+                level: 0,
+                parentId: null
+            },
+            {
+                id: 2,
+                text: "Market Research",
+                completed: true,
+                level: 1,
+                parentId: 1
+            },
+            {
+                id: 3,
+                text: "Product Development",
+                completed: false,
+                level: 1,
+                parentId: 1
+            },
+            {
+                id: 4,
+                text: "Competitor Analysis",
+                completed: true,
+                level: 2,
+                parentId: 2
+            },
+            {
+                id: 5,
+                text: "UI Design",
+                completed: false,
+                level: 2,
+                parentId: 3
+            }
+        ];
+
+        function exportToMermaid(mainGoal, goals) {
+            if (goals.length === 0) return '';
+            
+            const lines = ['graph TD'];
+            
+            const getNodeId = (index) => String.fromCharCode(65 + index);
+            
+            const sortedGoals = [...goals].sort((a, b) => {
+                if (a.level !== b.level) return a.level - b.level;
+                return a.id - b.id;
+            });
+            
+            const goalToNodeId = new Map();
+            sortedGoals.forEach((goal, index) => {
+                goalToNodeId.set(goal.id, getNodeId(index));
+            });
+            
+            sortedGoals.forEach((goal) => {
+                const nodeId = goalToNodeId.get(goal.id);
+                const emoji = goal.completed ? '✅' : '📝';
+                const escapedText = goal.text.replace(/"/g, '\\"');
+                const displayText = goal.text || (goal.level === 0 ? 'Main Goal' : 'Untitled Task');
+                lines.push(`    ${nodeId}["${emoji} ${escapedText || displayText}"]`);
+            });
+            
+            sortedGoals.forEach((goal) => {
+                const childNodeId = goalToNodeId.get(goal.id);
+                
+                if (goal.parentId !== null) {
+                    const parentNodeId = goalToNodeId.get(goal.parentId);
+                    if (parentNodeId) {
+                        lines.push(`    ${parentNodeId} --> ${childNodeId}`);
+                    }
+                }
+            });
+            
+            return lines.join('\n');
+        }
+
+        // Test the export
+        window.onload = () => {
+            const result = exportToMermaid("", testGoals);
+            const output = document.getElementById('output');
+            output.textContent = result;
+            
+            // Also create a link to visualize in mermaid live editor
+            const encoded = encodeURIComponent(result);
+            const link = document.getElementById('mermaid-link');
+            link.href = `https://mermaid.live/edit#pako:${btoa(result)}`;
+        };
+    </script>
+</head>
+<body>
+    <h1>Mermaid Export Test</h1>
+    <h2>Generated Mermaid Code:</h2>
+    <pre id="output" style="background: #f5f5f5; padding: 10px; border-radius: 5px;"></pre>
+    
+    <h2>View in Mermaid Live Editor:</h2>
+    <a id="mermaid-link" target="_blank" style="color: blue; text-decoration: underline;">
+        Open in Mermaid Live Editor
+    </a>
+    
+    <h2>Expected Output:</h2>
+    <pre style="background: #e8f4fd; padding: 10px; border-radius: 5px;">
+graph TD
+    A["📝 Launch New Mobile App"]
+    B["✅ Market Research"]
+    C["📝 Product Development"]
+    D["✅ Competitor Analysis"]
+    E["📝 UI Design"]
+    A --> B
+    A --> C
+    B --> D
+    C --> E
+    </pre>
+</body>
+</html>

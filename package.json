@@ -1,7 +1,7 @@
 {
-  "name": "fluid-goals",
+  "name": "goal-breaker",
   "version": "0.1.0",
-  "description": "Interactive mindmap-style goal breakdown tool",
+  "description": "Distraction-free problem-solving tool for breaking down overwhelming goals",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.4",

@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, Check, X, Target, Edit3, Move, Eye, EyeOff, Focus } from 'lucide-react';
+import { Plus, Check, X, Target, Edit3, Move, Eye, EyeOff, Focus, Menu } from 'lucide-react';
+import { ConnectionLines } from '../ConnectionLines';
+import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition } from '../../utils/gridHelpers';
+import { getLevelStyle, getLevelStats, getLevelLabel } from '../../utils/styleHelpers';
+import { exportToMermaid, copyToClipboard } from '../../utils/mermaidHelpers';
 
-const FluidGoalBreakdown = () => {
+const GoalBreaker = () => {
   const [goals, setGoals] = useState([]);
   const [mainGoal, setMainGoal] = useState('');
   const [isStarted, setIsStarted] = useState(false);
+  const [currentView, setCurrentView] = useState('canvas'); // 'canvas' or 'list'
   const [draggedGoal, setDraggedGoal] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [connections, setConnections] = useState([]);
@@ -14,211 +19,228 @@ const FluidGoalBreakdown = () => {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
   const canvasRef = useRef(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 2000, height: 1200 });
+  const [canvasSize, setCanvasSize] = useState({ 
+    width: window.innerWidth, 
+    height: window.innerHeight - 80  // Account for header
+  });
 
-  // Grid system constants
-  const GRID = {
-    COLUMN_WIDTH: 400,
-    ROW_HEIGHT: 140,
-    CARD_WIDTH: 320,
-    CARD_HEIGHT: 120,
-    MARGIN: 40
-  };
 
-  // Level styling system - borders only, intensity increases with level
-  const getLevelStyle = (level, completed) => {
-    const levelStyles = [
-      { border: 'border-yellow-400', borderWidth: 'border-4', color: 'text-yellow-600' }, // Ultimate goal
-      { border: 'border-blue-300', borderWidth: 'border-2', color: 'text-blue-500' },
-      { border: 'border-purple-400', borderWidth: 'border-[3px]', color: 'text-purple-600' },
-      { border: 'border-green-400', borderWidth: 'border-[3px]', color: 'text-green-600' },
-      { border: 'border-orange-400', borderWidth: 'border-[4px]', color: 'text-orange-600' },
-      { border: 'border-pink-400', borderWidth: 'border-[4px]', color: 'text-pink-600' },
-      { border: 'border-red-400', borderWidth: 'border-[4px]', color: 'text-red-600' },
-      { border: 'border-indigo-500', borderWidth: 'border-[5px]', color: 'text-indigo-700' }
-    ];
-    
-    const style = levelStyles[Math.min(level, levelStyles.length - 1)];
-    
-    if (completed) {
-      return {
-        border: 'border-green-500',
-        borderWidth: style.borderWidth,
-        bg: 'bg-green-100',
-        color: 'text-green-800'
-      };
-    }
-    
-    return {
-      border: style.border,
-      borderWidth: style.borderWidth,
-      bg: 'bg-white',
-      color: style.color
-    };
-  };
 
-  // Convert grid coordinates to pixel position
-  const gridToPosition = (level, row) => {
-    const x = canvasSize.width - GRID.MARGIN - (level * GRID.COLUMN_WIDTH) - GRID.CARD_WIDTH;
-    const y = GRID.MARGIN + (row * GRID.ROW_HEIGHT);
-    return {
-      x: Math.max(GRID.MARGIN, x),
-      y: Math.max(GRID.MARGIN, y)
-    };
-  };
-
-  // Convert pixel position to grid coordinates
-  const positionToGrid = (position) => {
-    const level = Math.max(0, Math.round((canvasSize.width - position.x - GRID.CARD_WIDTH - GRID.MARGIN) / GRID.COLUMN_WIDTH));
-    const row = Math.max(0, Math.round((position.y - GRID.MARGIN) / GRID.ROW_HEIGHT));
-    return { level, row };
-  };
-
-  // Get next available row for a level
-  const getNextRowForLevel = (level) => {
-    const levelGoals = goals.filter(g => g.level === level);
-    if (levelGoals.length === 0) return 0;
-    
-    const occupiedRows = levelGoals.map(g => g.gridRow).sort((a, b) => a - b);
-    let nextRow = 0;
-    for (const row of occupiedRows) {
-      if (row === nextRow) {
-        nextRow++;
-      } else {
-        break;
-      }
-    }
-    return nextRow;
-  };
-
-  // Shift goals in a level when inserting at specific row
-  const shiftGoalsDown = (level, fromRow, excludeId = null) => {
-    setGoals(prev => prev.map(goal => {
-      if (goal.level === level && goal.gridRow >= fromRow && goal.id !== excludeId) {
-        const newRow = goal.gridRow + 1;
-        return {
-          ...goal,
-          gridRow: newRow,
-          position: gridToPosition(level, newRow)
-        };
-      }
-      return goal;
-    }));
-  };
-
-  // Compact goals in a level (remove gaps)
-  const compactLevel = (level) => {
-    const levelGoals = goals
-      .filter(g => g.level === level)
-      .sort((a, b) => a.gridRow - b.gridRow);
-    
-    setGoals(prev => prev.map(goal => {
-      const goalIndex = levelGoals.findIndex(g => g.id === goal.id);
-      if (goalIndex !== -1 && goal.level === level) {
-        return {
-          ...goal,
-          gridRow: goalIndex,
-          position: gridToPosition(level, goalIndex)
-        };
-      }
-      return goal;
-    }));
-  };
-
-  // Initialize with grid positioning
-  const startBreakdown = () => {
-    if (mainGoal.trim()) {
-      const rootGoal = {
-        id: 1,
-        text: mainGoal,
-        completed: false,
-        level: 0,
-        gridRow: 0,
-        parentId: null,
-        position: gridToPosition(0, 0),
-        children: []
-      };
-      setGoals([rootGoal]);
-      setIsStarted(true);
-      setCanvasOffset({ 
-        x: -(canvasSize.width - 800), 
-        y: -(canvasSize.height / 2 - 300) 
-      });
-    }
-  };
-
-  // Keyboard handlers
+  // Initialize with empty state - user defines problem directly on canvas
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
-        e.preventDefault();
-        setSpacePressed(true);
-      }
+    if (!isStarted) {
+      setIsStarted(true);
+      // Start with no offset since canvas is now viewport-sized
+      setCanvasOffset({ x: 0, y: 0 });
+    }
+  }, [isStarted]);
+
+  // Handle window resize to keep canvas viewport-sized
+  useEffect(() => {
+    const handleResize = () => {
+      setCanvasSize({
+        width: window.innerWidth,
+        height: window.innerHeight - 80
+      });
     };
 
-    const handleKeyUp = (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        setSpacePressed(false);
-        setIsPanning(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Pan handlers
-  const handlePanStart = (e) => {
-    if (spacePressed || e.button === 1) {
-      e.preventDefault();
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - canvasOffset.x, y: e.clientY - canvasOffset.y });
-    }
-  };
-
-  const handlePanMove = useCallback((e) => {
-    if (isPanning) {
-      e.preventDefault();
-      setCanvasOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y
-      });
-    }
-  }, [isPanning, panStart]);
-
-  const handlePanEnd = () => {
-    setIsPanning(false);
-  };
-
-  const handleWheel = (e) => {
-    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      e.preventDefault();
-      setCanvasOffset(prev => ({
-        x: prev.x - e.deltaX * 2,
-        y: prev.y - e.deltaY * 2
-      }));
-    }
-  };
-
   useEffect(() => {
-    if (isPanning) {
-      document.addEventListener('mousemove', handlePanMove);
-      document.addEventListener('mouseup', handlePanEnd);
-      return () => {
-        document.removeEventListener('mousemove', handlePanMove);
-        document.removeEventListener('mouseup', handlePanEnd);
-      };
-    }
-  }, [isPanning, handlePanMove]);
+    const newConnections = [];
+    const visibleGoals = getVisibleGoals();
+    const visibleGoalIds = new Set(visibleGoals.map(g => g.id));
+    
+    goals.forEach(goal => {
+      if (goal.parentId !== null) {
+        const parent = goals.find(g => g.id === goal.parentId);
+        if (parent && visibleGoalIds.has(parent.id)) {
+          // Check if child is visible
+          if (visibleGoalIds.has(goal.id)) {
+            // Normal connection: both parent and child are visible
+            const fromX = parent.position.x; // Left edge of parent card
+            const fromY = parent.position.y + GRID.CARD_HEIGHT / 2; // Middle height of parent
+            const toX = goal.position.x + GRID.CARD_WIDTH; // Right edge of child card
+            const toY = goal.position.y + GRID.CARD_HEIGHT / 2; // Middle height of child
+            
+            // Create straight horizontal line with slight curve
+            const midX = fromX + (toX - fromX) / 2;
+            const curveOffset = 20; // Small fixed curve for visual appeal
+            
+            newConnections.push({
+              id: `${parent.id}-${goal.id}`,
+              from: { x: fromX, y: fromY },
+              to: { x: toX, y: toY },
+              completed: parent.completed && goal.completed,
+              path: `M ${fromX} ${fromY} Q ${midX} ${fromY - curveOffset} ${toX} ${toY}`,
+              type: 'normal'
+            });
+          } else {
+            // Child is hidden - create placeholder connection
+            const fromX = parent.position.x;
+            const fromY = parent.position.y + GRID.CARD_HEIGHT / 2;
+            const toX = fromX + 120; // Shorter line to placeholder
+            const toY = fromY;
+            
+            // Count hidden children for this parent
+            const hiddenChildren = goals.filter(g => 
+              g.parentId === parent.id && !visibleGoalIds.has(g.id)
+            ).length;
+            
+            // Only add placeholder if we haven't already added one for this parent
+            const existingPlaceholder = newConnections.find(c => 
+              c.type === 'placeholder' && c.parentId === parent.id
+            );
+            
+            if (!existingPlaceholder) {
+              newConnections.push({
+                id: `placeholder-${parent.id}`,
+                from: { x: fromX, y: fromY },
+                to: { x: toX, y: toY },
+                completed: false,
+                path: `M ${fromX} ${fromY} L ${toX} ${toY}`,
+                type: 'placeholder',
+                parentId: parent.id,
+                hiddenCount: hiddenChildren
+              });
+            }
+          }
+        }
+      }
+    });
+    setConnections(newConnections);
+  }, [goals, hiddenLevels, focusedGoal, GRID.CARD_WIDTH, GRID.CARD_HEIGHT]);
 
-  // Get visible goals based on focus
+  // Calculate existing levels from goals array
+  const existingLevels = [...new Set(goals.map(goal => goal.level))].sort();
+
+  // Goal management functions
+  const updateGoal = (id, newText) => {
+    setGoals(goals.map(goal => 
+      goal.id === id 
+        ? { ...goal, text: newText, isEditing: false }
+        : goal
+    ));
+  };
+
+  const startEditing = (id) => {
+    setGoals(goals.map(goal => 
+      goal.id === id 
+        ? { ...goal, isEditing: true }
+        : goal
+    ));
+  };
+
+  const toggleComplete = (id) => {
+    setGoals(goals.map(goal => 
+      goal.id === id 
+        ? { ...goal, completed: !goal.completed }
+        : goal
+    ));
+  };
+
+  const deleteGoal = (id) => {
+    setGoals(goals.filter(goal => goal.id !== id && goal.parentId !== id));
+  };
+
+  const reset = () => {
+    setGoals([]);
+    setMainGoal('');
+    setCanvasOffset({ x: 0, y: 0 });
+  };
+
+  // Export functionality
+  const handleExport = async () => {
+    try {
+      // Find the main goal (level 0 goals)
+      const mainGoals = goals.filter(g => g.level === 0);
+      
+      if (mainGoals.length === 0 && goals.length === 0) {
+        setExportMessage('❌ No goals to export');
+        setTimeout(() => setExportMessage(''), 2000);
+        return;
+      }
+      
+      // For now, use the first main goal as the primary one
+      // In the future, we might want to handle multiple main goals
+      const primaryMainGoal = mainGoals.length > 0 ? mainGoals[0].text : 'Untitled Goal';
+      
+      // Generate mermaid diagram
+      const mermaidCode = exportToMermaid(primaryMainGoal, goals);
+      
+      if (!mermaidCode) {
+        setExportMessage('❌ No content to export');
+        setTimeout(() => setExportMessage(''), 2000);
+        return;
+      }
+      
+      // Copy to clipboard
+      const success = await copyToClipboard(mermaidCode);
+      
+      if (success) {
+        setExportMessage('✅ Mermaid code copied!');
+      } else {
+        setExportMessage('❌ Failed to copy');
+      }
+      
+      // Clear message after 2 seconds
+      setTimeout(() => setExportMessage(''), 2000);
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportMessage('❌ Export failed');
+      setTimeout(() => setExportMessage(''), 2000);
+    }
+  };;
+
+  const addSubGoal = (parentId) => {
+    const parent = goals.find(g => g.id === parentId);
+    if (!parent) return;
+
+    // Get existing siblings to calculate balanced position
+    const existingSiblings = goals.filter(g => g.parentId === parentId);
+    
+    const newId = Math.max(0, ...goals.map(g => g.id), 0) + 1;
+    const newLevel = parent.level + 1;
+    
+    // Use new positioning logic that distributes children around parent
+    const newPosition = calculateChildPosition(parent, existingSiblings, canvasSize.width, canvasSize.height);
+
+    const newGoal = {
+      id: newId,
+      text: '',
+      completed: false,
+      level: newLevel,
+      gridRow: existingSiblings.length, // Keep for compatibility
+      parentId: parentId,
+      position: newPosition,
+      isEditing: true,
+      children: []
+    };
+
+    setGoals(prev => [...prev, newGoal]);
+  };
+
+  const toggleLevelVisibility = (level) => {
+    const newHidden = new Set(hiddenLevels);
+    if (newHidden.has(level)) {
+      newHidden.delete(level);
+    } else {
+      newHidden.add(level);
+    }
+    setHiddenLevels(newHidden);
+  };
+
+  const toggleFocus = (goalId) => {
+    setFocusedGoal(focusedGoal === goalId ? null : goalId);
+  };
+
+  // Get visible goals based on focus and hidden levels
   const getVisibleGoals = () => {
     let visibleGoals = goals.filter(goal => !hiddenLevels.has(goal.level));
     
@@ -251,59 +273,26 @@ const FluidGoalBreakdown = () => {
     return visibleGoals;
   };
 
-  // Connection calculation
-  const calculateConnections = useCallback(() => {
-    const newConnections = [];
-    const visibleGoals = getVisibleGoals();
+  // Add a new root-level goal
+  const addRootGoal = (position = null) => {
+    const newId = Math.max(0, ...goals.map(g => g.id), 0) + 1;
+    const newRow = getNextRowForLevel(0, goals);
     
-    visibleGoals.forEach(goal => {
-      if (goal.parentId) {
-        const parent = goals.find(g => g.id === goal.parentId);
-        
-        if (parent && visibleGoals.includes(parent)) {
-          const startX = parent.position.x;
-          const startY = parent.position.y + (GRID.CARD_HEIGHT / 2);
-          const endX = goal.position.x + GRID.CARD_WIDTH;
-          const endY = goal.position.y + (GRID.CARD_HEIGHT / 2);
-          
-          newConnections.push({
-            id: `${parent.id}-${goal.id}`,
-            from: { x: startX, y: startY },
-            to: { x: endX, y: endY },
-            completed: goal.completed && parent.completed,
-            path: `M ${startX} ${startY} 
-                   C ${startX - 80} ${startY}, 
-                     ${endX + 80} ${endY}, 
-                     ${endX} ${endY}`
-          });
+    // Position ultimate goal on the right side of canvas
+    const newPosition = position || (goals.length === 0 
+      ? { 
+          x: canvasSize.width - GRID.MARGIN - GRID.CARD_WIDTH, // Right side positioning
+          y: (canvasSize.height - GRID.CARD_HEIGHT) / 2 
         }
-      }
-    });
-    
-    setConnections(newConnections);
-  }, [goals, hiddenLevels, focusedGoal]);
-
-  useEffect(() => {
-    calculateConnections();
-  }, [calculateConnections]);
-
-  // Add sub-goal with grid positioning
-  const addSubGoal = (parentId) => {
-    const parent = goals.find(g => g.id === parentId);
-    if (!parent) return;
-
-    const newId = Math.max(0, ...goals.map(g => g.id)) + 1;
-    const newLevel = parent.level + 1;
-    const newRow = getNextRowForLevel(newLevel);
-    const newPosition = gridToPosition(newLevel, newRow);
+      : gridToPosition(0, newRow, canvasSize.width));
 
     const newGoal = {
       id: newId,
       text: '',
       completed: false,
-      level: newLevel,
+      level: 0,
       gridRow: newRow,
-      parentId: parentId,
+      parentId: null,
       position: newPosition,
       isEditing: true,
       children: []
@@ -312,190 +301,411 @@ const FluidGoalBreakdown = () => {
     setGoals(prev => [...prev, newGoal]);
   };
 
-  // Grid-based drag handlers
-  const handleDragStart = (e, goal) => {
-    if (goal.isEditing || isPanning) return;
-    setDraggedGoal(goal);
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
+  // Canvas event handlers
+
+  const handleCanvasMouseDown = (e) => {
+    // Only start panning if clicking on canvas background, not on a goal
+    if (e.target === canvasRef.current || e.target.closest('.canvas-background')) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY });
+      e.preventDefault();
+    }
   };
 
-  const handleDrag = useCallback((e) => {
-    if (!draggedGoal || !canvasRef.current || isPanning) return;
-    
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    const mouseX = (e.clientX - canvasRect.left - canvasOffset.x) - dragOffset.x;
-    const mouseY = (e.clientY - canvasRect.top - canvasOffset.y) - dragOffset.y;
-
-    const proposedPosition = {
-      x: Math.max(0, Math.min(canvasSize.width - GRID.CARD_WIDTH, mouseX)),
-      y: Math.max(0, Math.min(canvasSize.height - GRID.CARD_HEIGHT, mouseY))
-    };
-
-    // Convert to grid coordinates and snap
-    const gridCoords = positionToGrid(proposedPosition);
-    const snappedPosition = gridToPosition(gridCoords.level, gridCoords.row);
-
-    setGoals(prev => prev.map(goal => 
-      goal.id === draggedGoal.id 
-        ? { 
-            ...goal, 
-            position: snappedPosition,
-            level: gridCoords.level,
-            gridRow: gridCoords.row
-          }
-        : goal
-    ));
-  }, [draggedGoal, dragOffset, canvasSize, canvasOffset, isPanning]);
-
-  const handleDragEnd = () => {
-    if (draggedGoal) {
-      const draggedGoalData = goals.find(g => g.id === draggedGoal.id);
-      if (draggedGoalData) {
-        // Check if there's another goal at this position
-        const conflictingGoal = goals.find(g => 
-          g.id !== draggedGoal.id && 
-          g.level === draggedGoalData.level && 
-          g.gridRow === draggedGoalData.gridRow
-        );
-
-        if (conflictingGoal) {
-          // Shift the conflicting goal and others down
-          shiftGoalsDown(draggedGoalData.level, draggedGoalData.gridRow, draggedGoal.id);
-        }
-
-        // Compact the original level if the dragged goal moved levels
-        if (draggedGoalData.level !== draggedGoal.level) {
-          compactLevel(draggedGoal.level);
-        }
-      }
+  const handleCanvasMouseMove = (e) => {
+    if (isPanning) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+      setCanvasOffset(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      setPanStart({ x: e.clientX, y: e.clientY });
     }
+    
+    // Handle goal dragging
+    if (draggedGoal) {
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - canvasRect.left - canvasOffset.x - dragOffset.x;
+      const mouseY = e.clientY - canvasRect.top - canvasOffset.y - dragOffset.y;
+
+      setGoals(goals.map(goal => 
+        goal.id === draggedGoal.id 
+          ? { ...goal, position: { x: mouseX, y: mouseY } }
+          : goal
+      ));
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsPanning(false);
     setDraggedGoal(null);
   };
 
-  useEffect(() => {
-    if (draggedGoal && !isPanning) {
-      document.addEventListener('mousemove', handleDrag);
-      document.addEventListener('mouseup', handleDragEnd);
-      return () => {
-        document.removeEventListener('mousemove', handleDrag);
-        document.removeEventListener('mouseup', handleDragEnd);
-      };
-    }
-  }, [draggedGoal, handleDrag, isPanning]);
-
-  const updateGoal = (id, text) => {
-    setGoals(goals.map(goal => 
-      goal.id === id 
-        ? { ...goal, text, isEditing: false }
-        : goal
-    ));
-  };
-
-  const startEditing = (id) => {
-    setGoals(goals.map(goal => 
-      goal.id === id 
-        ? { ...goal, isEditing: true }
-        : goal
-    ));
-  };
-
-  const toggleComplete = (id) => {
-    setGoals(goals.map(goal => 
-      goal.id === id 
-        ? { ...goal, completed: !goal.completed }
-        : goal
-    ));
-  };
-
-  const deleteGoal = (id) => {
-    const goalToDelete = goals.find(g => g.id === id);
-    if (goalToDelete) {
-      setGoals(goals.filter(goal => goal.id !== id && goal.parentId !== id));
-      // Compact the level after deletion
-      setTimeout(() => compactLevel(goalToDelete.level), 50);
+  const handleCanvasKeyDown = (e) => {
+    if (e.code === 'Space') {
+      // Don't prevent spacebar if user is editing text
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+        return;
+      }
+      setSpacePressed(true);
+      e.preventDefault();
     }
   };
 
-  const toggleFocus = (goalId) => {
-    setFocusedGoal(focusedGoal === goalId ? null : goalId);
-  };
-
-  const reset = () => {
-    setGoals([]);
-    setMainGoal('');
-    setIsStarted(false);
-    setConnections([]);
-    setHiddenLevels(new Set());
-    setFocusedGoal(null);
-    setCanvasOffset({ x: 0, y: 0 });
-  };
-
-  const toggleLevelVisibility = (level) => {
-    const newHidden = new Set(hiddenLevels);
-    if (newHidden.has(level)) {
-      newHidden.delete(level);
-    } else {
-      newHidden.add(level);
+  const handleCanvasKeyUp = (e) => {
+    if (e.code === 'Space') {
+      // Don't prevent spacebar if user is editing text
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+        return;
+      }
+      setSpacePressed(false);
+      e.preventDefault();
     }
-    setHiddenLevels(newHidden);
   };
 
-  const getLevelStats = (level) => {
-    const levelGoals = goals.filter(g => g.level === level);
-    const completed = levelGoals.filter(g => g.completed).length;
-    return { total: levelGoals.length, completed };
-  };
-
-  const getLevelLabel = (level) => {
-    if (level === 0) return '🎯 Ultimate Goal';
-    const labels = ['📋 Strategy', '🎯 Tactics', '⚡ Actions', '📝 Tasks', '✅ Steps', '🔍 Details', '💡 Micro'];
-    return labels[level - 1] || `📌 Level ${level}`;
-  };
-
-  const existingLevels = [...new Set(goals.map(g => g.level))].sort((a, b) => a - b);
-
-  const getGoalStyle = (goal) => {
-    const levelStyle = getLevelStyle(goal.level, goal.completed);
-    const baseStyle = "absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] select-none";
-    const cursorStyle = isPanning ? 'cursor-grab' : (goal.isEditing ? 'cursor-text' : 'cursor-move');
+  const handleGoalDragStart = (goal, e) => {
+    // Prevent canvas panning when starting to drag a goal
+    e.stopPropagation();
     
-    return `${baseStyle} ${levelStyle.bg} ${levelStyle.border} ${levelStyle.borderWidth} ${cursorStyle}`;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    
+    // Calculate the offset from the mouse to the goal's top-left corner
+    const mouseX = e.clientX - canvasRect.left;
+    const mouseY = e.clientY - canvasRect.top;
+    
+    const goalX = goal.position.x + canvasOffset.x;
+    const goalY = goal.position.y + canvasOffset.y;
+    
+    setDragOffset({
+      x: mouseX - goalX,
+      y: mouseY - goalY
+    });
+    
+    setDraggedGoal(goal);
   };
 
-  if (!isStarted) {
+  // GoalCard component
+  const GoalCard = ({ goal, onUpdate, onToggleComplete, onAddSubGoal, onDelete, onStartEditing, onToggleFocus, isFocused, isDragged, onDragStart }) => {
+    const levelStyle = getLevelStyle(goal.level, goal.completed);
+    
+    const handleMouseDown = (e) => {
+      // Only start dragging if not clicking on interactive elements or their children
+      const target = e.target;
+      const isButton = target.tagName === 'BUTTON' || target.closest('button');
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isSvg = target.tagName === 'svg' || target.tagName === 'SVG';
+      const isText = target.tagName === 'P' || target.closest('p'); // Add text paragraph check
+      
+      if (isButton || isInput || isSvg || isText) {
+        return; // Don't start drag on interactive elements or text
+      }
+      
+      // Don't start drag if goal is in editing mode
+      if (goal.isEditing) {
+        return;
+      }
+      
+      onDragStart(goal, e);
+    };
+    
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full transform transition-all duration-500 hover:scale-105">
-          <div className="text-center mb-8">
-            <Target className="mx-auto mb-4 text-yellow-600" size={64} />
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Fluid Goals</h1>
-            <p className="text-gray-600">Interactive mindmap-style goal breakdown</p>
-            <p className="text-sm text-gray-500 mt-2">✨ Work backwards from your ultimate goal</p>
+      <div
+        className={`absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl cursor-move ${levelStyle.border} ${levelStyle.borderWidth} ${
+          goal.completed ? 'bg-green-100' : levelStyle.bg
+        } ${
+          isDragged ? 'scale-105 rotate-2 z-50' : ''
+        } ${isFocused ? 'ring-4 ring-blue-300' : ''}`}
+        style={{
+          left: goal.position.x,
+          top: goal.position.y,
+          width: GRID.CARD_WIDTH,
+          height: GRID.CARD_HEIGHT,
+          zIndex: isDragged ? 50 : isFocused ? 30 : 10,
+          userSelect: 'none'
+        }}
+        onMouseDown={handleMouseDown}
+      >
+        <div className="p-4 h-full flex flex-col">
+          {/* Card Header */}
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleComplete(goal.id);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                  goal.completed 
+                    ? 'bg-green-500 text-white scale-110' 
+                    : 'bg-gray-100 border-2 border-gray-300 hover:border-green-400 hover:bg-green-50'
+                }`}
+              >
+                <Check size={12} />
+              </button>
+              
+
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleFocus(goal.id);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                  isFocused 
+                    ? 'bg-blue-500 text-white' 
+                    : 'text-gray-400 hover:bg-gray-100 hover:text-blue-500'
+                }`}
+              >
+                <Focus size={12} />
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Add subgoal clicked for goal:', goal.id);
+                  onAddSubGoal(goal.id);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className="p-1.5 rounded-full text-purple-500 hover:bg-purple-100 transition-all cursor-pointer"
+              >
+                <Plus size={12} />
+              </button>
+              
+              {goal.level > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Delete goal clicked for goal:', goal.id);
+                    onDelete(goal.id);
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  className="p-1.5 rounded-full text-red-500 hover:bg-red-100 transition-all cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="space-y-6">
-            <input
-              type="text"
-              value={mainGoal}
-              onChange={(e) => setMainGoal(e.target.value)}
-              placeholder="What's your ultimate goal?"
-              className="w-full p-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-300 text-lg"
-              onKeyDown={(e) => e.key === 'Enter' && startBreakdown()}
-            />
-            <button
-              onClick={startBreakdown}
-              disabled={!mainGoal.trim()}
-              className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 rounded-xl font-bold text-lg hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-300 disabled:to-gray-300 transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
-            >
-              Create Goal Map
-            </button>
+
+          {/* Card Content */}
+          <div className="flex-1 flex items-center">
+            {goal.isEditing ? (
+              <div className="relative w-full h-full">
+                <textarea
+                  defaultValue={goal.text}
+                  className="w-full h-full p-2 border border-blue-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+                  placeholder={goal.level === 0 ? "What's your main goal?" : "Describe this task..."}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      if (e.target.value.trim()) {
+                        onUpdate(goal.id, e.target.value);
+                        e.preventDefault();
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      if (goal.level > 0 && !goal.text) {
+                        onDelete(goal.id);
+                      } else {
+                        onUpdate(goal.id, goal.text || '');
+                      }
+                      e.preventDefault();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    if (value) {
+                      onUpdate(goal.id, value);
+                    } else if (goal.level > 0) {
+                      onDelete(goal.id);
+                    } else {
+                      // For main goals, keep empty but exit edit mode
+                      onUpdate(goal.id, '');
+                    }
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()} // Prevent drag when editing
+                />
+
+              </div>
+            ) : (
+              <p 
+                className={`w-full text-sm cursor-text p-2 rounded-lg transition-colors ${
+                  goal.completed ? 'line-through text-green-700' : `hover:bg-gray-200 ${levelStyle.color}`
+                } ${goal.level === 0 ? 'font-bold' : 'font-medium'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartEditing(goal.id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {goal.text || (goal.level === 0 ? "Click to define your main goal..." : "Click to add task...")}
+              </p>
+            )}
           </div>
         </div>
       </div>
     );
+  };
+
+  // Render list view component
+  const renderListView = () => {
+    const renderGoalItem = (goal, depth = 0) => {
+      const children = goals.filter(g => g.parentId === goal.id);
+      const levelStyle = getLevelStyle(goal.level, goal.completed);
+      
+      return (
+        <div key={goal.id} className="space-y-2">
+          <div 
+            className={`flex items-center gap-3 p-3 rounded-lg border-2 ${levelStyle.border} ${levelStyle.bg} transition-all hover:shadow-md`}
+            style={{ marginLeft: `${depth * 24}px` }}
+          >
+            <button
+              onClick={() => toggleComplete(goal.id)}
+              className={`p-1 rounded transition-colors ${
+                goal.completed 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-white border-2 border-gray-300 hover:border-green-400'
+              }`}
+            >
+              <Check size={14} />
+            </button>
+            
+            {goal.isEditing ? (
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  defaultValue={goal.text}
+                  className="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  placeholder={goal.level === 0 ? "What's your main goal?" : "Enter task..."}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (e.target.value.trim()) {
+                        updateGoal(goal.id, e.target.value);
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      if (goal.level > 0 && !goal.text) {
+                        deleteGoal(goal.id);
+                      } else {
+                        updateGoal(goal.id, goal.text || '');
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    if (value) {
+                      updateGoal(goal.id, value);
+                    } else if (goal.level > 0) {
+                      deleteGoal(goal.id);
+                    } else {
+                      updateGoal(goal.id, '');
+                    }
+                  }}
+                />
+
+              </div>
+            ) : (
+              <p 
+                className={`flex-1 cursor-pointer p-2 rounded transition-colors ${
+                  goal.completed ? 'line-through text-green-700' : `hover:bg-gray-200 ${levelStyle.color}`
+                } ${goal.level === 0 ? 'font-bold text-lg' : 'font-medium'}`}
+                onClick={() => startEditing(goal.id)}
+              >
+                {goal.text || (goal.level === 0 ? "Click to define your main goal..." : "Click to add task...")}
+              </p>
+            )}
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => addSubGoal(goal.id)}
+                className="text-purple-600 hover:bg-purple-100 p-1 rounded"
+              >
+                <Plus size={16} />
+              </button>
+              
+              {goal.level > 0 && (
+                <button
+                  onClick={() => deleteGoal(goal.id)}
+                  className="text-red-600 hover:bg-red-100 p-1 rounded"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {children.length > 0 && (
+            <div className="space-y-2">
+              {children.map(child => renderGoalItem(child, depth + 1))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="p-6 max-w-4xl mx-auto" style={{ marginTop: '80px' }}>
+        <div className="space-y-4">
+          {goals.length === 0 ? (
+            <div 
+              className="p-6 border-4 border-dashed border-yellow-300 rounded-xl text-center cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 transition-colors"
+              onClick={() => {
+                const newGoal = {
+                  id: 1,
+                  text: '',
+                  completed: false,
+                  level: 0,
+                  gridRow: 0,
+                  parentId: null,
+                  position: {
+                    x: (canvasSize.width - GRID.CARD_WIDTH) / 2,
+                    y: (canvasSize.height - GRID.CARD_HEIGHT) / 2
+                  },
+                  children: [],
+                  isEditing: true
+                };
+                setGoals([newGoal]);
+              }}
+            >
+              <Target className="mx-auto mb-3 text-yellow-600" size={48} />
+              <h2 className="text-xl font-bold text-yellow-800 mb-2">Start Breaking Down Your Goal</h2>
+              <p className="text-yellow-700">Click here to define your main goal and start breaking it down</p>
+            </div>
+          ) : (
+            goals
+              .filter(goal => goal.level === 0)
+              .map(rootGoal => renderGoalItem(rootGoal))
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Component logic - should be inside the main component function
+  if (!isStarted) {
+    return <div>Loading...</div>;
   }
 
   return (
@@ -506,7 +716,7 @@ const FluidGoalBreakdown = () => {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
               <Target className="text-yellow-600" size={24} />
-              <h1 className="text-xl font-bold text-gray-800">Fluid Goal Breakdown</h1>
+              <h1 className="text-xl font-bold text-gray-800">Goal Breaker</h1>
               {focusedGoal && (
                 <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                   Focus Mode Active
@@ -514,11 +724,35 @@ const FluidGoalBreakdown = () => {
               )}
             </div>
 
+            {/* View Toggle */}
+            <div className="flex items-center bg-white rounded-lg p-1 shadow-lg border border-gray-200">
+              <button
+                onClick={() => setCurrentView('canvas')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  currentView === 'canvas' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-600 hover:text-blue-600'
+                }`}
+              >
+                Canvas
+              </button>
+              <button
+                onClick={() => setCurrentView('list')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  currentView === 'list' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-600 hover:text-blue-600'
+                }`}
+              >
+                List
+              </button>
+            </div>
+
             {/* Level Navigation */}
             {existingLevels.length > 1 && (
               <div className="flex items-center gap-2 bg-white rounded-xl p-2 shadow-lg border border-gray-200">
                 {existingLevels.map(level => {
-                  const stats = getLevelStats(level);
+                  const stats = getLevelStats(level, goals);
                   const isHidden = hiddenLevels.has(level);
                   const levelStyle = getLevelStyle(level, false);
                   
@@ -544,269 +778,193 @@ const FluidGoalBreakdown = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-              {goals.filter(g => g.completed).length} / {goals.length} completed
-            </div>
-            <div className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
-              {spacePressed ? '🖱️ Pan Mode' : 'Hold Space + Drag to Pan'}
-            </div>
+          <div className="flex items-center">
             <button
-              onClick={reset}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
             >
-              Reset
+              <span>Menu</span>
+              <Menu size={20} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Canvas */}
-      <div 
-        ref={canvasRef}
-        className={`relative w-full h-screen overflow-hidden ${isPanning ? 'cursor-grabbing' : spacePressed ? 'cursor-grab' : 'cursor-default'}`}
-        style={{ marginTop: '80px' }}
-        onMouseDown={handlePanStart}
-        onWheel={handleWheel}
-      >
-        <div 
-          className="absolute inset-0"
-          style={{
-            transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)`,
-            width: canvasSize.width,
-            height: canvasSize.height,
-            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(0,0,0,0.1) 1px, transparent 0)`,
-            backgroundSize: '20px 20px'
-          }}
-        >
-          {/* Grid visualization (optional - can be removed for cleaner look) */}
-          {false && (
-            <svg 
-              className="absolute top-0 left-0 w-full h-full pointer-events-none z-0 opacity-20"
-              style={{ width: canvasSize.width, height: canvasSize.height }}
-            >
-              {/* Vertical grid lines for columns */}
-              {Array.from({length: 8}).map((_, i) => (
-                <line
-                  key={`v-${i}`}
-                  x1={canvasSize.width - (i * GRID.COLUMN_WIDTH)}
-                  y1={0}
-                  x2={canvasSize.width - (i * GRID.COLUMN_WIDTH)}
-                  y2={canvasSize.height}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                  strokeDasharray="5,5"
-                />
-              ))}
-              {/* Horizontal grid lines for rows */}
-              {Array.from({length: 15}).map((_, i) => (
-                <line
-                  key={`h-${i}`}
-                  x1={0}
-                  y1={GRID.MARGIN + (i * GRID.ROW_HEIGHT)}
-                  x2={canvasSize.width}
-                  y2={GRID.MARGIN + (i * GRID.ROW_HEIGHT)}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                  strokeDasharray="5,5"
-                />
-              ))}
-            </svg>
-          )}
-
-          {/* SVG for connections */}
-          <svg 
-            className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
-            style={{ width: canvasSize.width, height: canvasSize.height }}
-          >
-            {connections.map(conn => (
-              <g key={conn.id}>
-                <path
-                  d={conn.path}
-                  stroke={conn.completed ? '#10b981' : '#6b7280'}
-                  strokeWidth="3"
-                  fill="none"
-                  className="transition-all duration-300"
-                  strokeDasharray={conn.completed ? '0' : '5,5'}
-                />
-                <circle
-                  cx={conn.from.x}
-                  cy={conn.from.y}
-                  r="4"
-                  fill={conn.completed ? '#10b981' : '#6b7280'}
-                />
-                <circle
-                  cx={conn.to.x}
-                  cy={conn.to.y}
-                  r="4"
-                  fill={conn.completed ? '#10b981' : '#6b7280'}
-                />
-              </g>
-            ))}
-          </svg>
-
-          {/* Goal nodes */}
-          {getVisibleGoals().map((goal) => {
-            const hasChildren = goals.filter(g => g.parentId === goal.id).length > 0;
-            const isFocused = focusedGoal === goal.id;
-            const levelStyle = getLevelStyle(goal.level, goal.completed);
-            
-            return (
-              <div
-                key={goal.id}
-                className={`${getGoalStyle(goal)} p-4 z-10 group ${isFocused ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}
-                style={{
-                  left: goal.position.x,
-                  top: goal.position.y,
-                  width: GRID.CARD_WIDTH,
-                  height: GRID.CARD_HEIGHT,
-                  transform: draggedGoal?.id === goal.id ? 'rotate(1deg) scale(1.03)' : 'none',
-                  zIndex: draggedGoal?.id === goal.id ? 20 : 10,
-                  pointerEvents: isPanning ? 'none' : 'auto'
-                }}
-                onMouseDown={(e) => !isPanning && handleDragStart(e, goal)}
+      {/* Hamburger Menu Overlay */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}>
+          <div className="absolute top-20 right-6 w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
+               onClick={(e) => e.stopPropagation()}>
+            {/* Menu Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800">Goal Breaker</h3>
+              <button
+                onClick={() => setIsMenuOpen(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               >
-                {goal.isEditing ? (
-                  <input
-                    type="text"
-                    defaultValue={goal.text}
-                    className="w-full h-full p-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-lg resize-none"
-                    placeholder="Enter goal..."
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target.value.trim()) {
-                        updateGoal(goal.id, e.target.value);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value.trim()) {
-                        updateGoal(goal.id, e.target.value);
-                      } else {
-                        deleteGoal(goal.id);
-                      }
-                    }}
-                  />
-                ) : (
-                  <>
-                    <div className="flex items-start gap-3 mb-3">
-                      {goal.level === 0 && (
-                        <Target className="text-yellow-600 mt-1 flex-shrink-0" size={20} />
-                      )}
-                      <p 
-                        className={`flex-1 text-sm font-medium leading-relaxed cursor-pointer hover:bg-black/5 p-1 rounded transition-colors ${
-                          goal.completed ? 'line-through' : ''
-                        } ${goal.level === 0 ? 'text-lg font-bold' : ''} ${levelStyle.color}`}
-                        onClick={() => startEditing(goal.id)}
-                        title="Click to edit"
-                      >
-                        {goal.text || 'Click to add text...'}
-                      </p>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Edit3 className="text-gray-400" size={12} />
-                        <Move className="text-gray-400" size={14} />
-                      </div>
-                    </div>
-                    
-                    {/* Progress indicator */}
-                    {hasChildren && (
-                      <div className="mb-3">
-                        {(() => {
-                          const children = goals.filter(g => g.parentId === goal.id);
-                          const completed = children.filter(g => g.completed).length;
-                          const total = children.length;
-                          const percentage = total > 0 ? (completed / total) * 100 : 0;
-                          
-                          return (
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs text-gray-600">
-                                <span>{completed}/{total} subtasks</span>
-                                <span>{Math.round(percentage)}%</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                <div 
-                                  className="bg-gradient-to-r from-green-500 to-green-400 h-1.5 rounded-full transition-all duration-500 ease-out"
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    
-                    <div className="flex justify-between items-center gap-2">
-                      <button
-                        onClick={() => addSubGoal(goal.id)}
-                        className="flex items-center gap-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1.5 rounded-lg hover:from-purple-600 hover:to-blue-600 text-sm font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md"
-                      >
-                        <Plus size={14} />
-                        Break Down
-                      </button>
-                      
-                      <div className="flex gap-1.5">
-                        {goal.level > 0 && (
-                          <button
-                            onClick={() => toggleFocus(goal.id)}
-                            className={`p-1.5 rounded-lg transition-all duration-300 transform hover:scale-110 active:scale-95 shadow-sm ${
-                              isFocused 
-                                ? 'bg-blue-500 text-white shadow-blue-200' 
-                                : 'bg-white text-blue-600 hover:bg-blue-100 border border-blue-400'
-                            }`}
-                            title={isFocused ? 'Exit focus mode' : 'Focus on this branch'}
-                          >
-                            <Focus size={14} />
-                          </button>
-                        )}
-                        
-                        <button
-                          onClick={() => toggleComplete(goal.id)}
-                          className={`p-1.5 rounded-lg transition-all duration-300 transform hover:scale-110 active:scale-95 shadow-sm ${
-                            goal.completed 
-                              ? 'bg-green-500 text-white shadow-green-200' 
-                              : 'bg-white text-green-600 hover:bg-green-100 border border-green-400'
-                          }`}
-                        >
-                          <Check size={14} />
-                        </button>
-                        
-                        {goal.level > 0 && (
-                          <button
-                            onClick={() => deleteGoal(goal.id)}
-                            className="p-1.5 rounded-lg bg-white text-red-600 hover:bg-red-100 border border-red-400 transition-all duration-300 transform hover:scale-110 active:scale-95 shadow-sm"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Instructions */}
-          {goals.length === 1 && (
-            <div className="absolute top-20 left-20 bg-yellow-100 border-2 border-yellow-300 rounded-xl p-4 max-w-sm shadow-lg">
-              <div className="flex items-start gap-3">
-                <Target className="text-yellow-600 mt-1" size={20} />
-                <div>
-                  <h3 className="font-semibold text-yellow-800 mb-2">Grid-Based Goal Layout 🎨</h3>
-                  <ul className="text-sm text-yellow-700 space-y-1">
-                    <li>• <strong>Perfect grid alignment</strong> - no overlaps</li>
-                    <li>• <strong>Drag to move rows</strong> - others shift automatically</li>
-                    <li>• <strong>Border thickness</strong> increases with level importance</li>
-                    <li>• <strong>Green fill</strong> shows completed goals</li>
-                    <li>• <strong>Space + Drag</strong> to pan around</li>
-                  </ul>
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Menu Items */}
+            <div className="p-4 space-y-4">
+              {/* Stats */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <span className="text-lg">📊</span>
+                  <span className="font-medium">Stats</span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-600 mb-1">
+                    {goals.filter(g => g.completed).length} / {goals.length} completed
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                      style={{ 
+                        width: goals.length > 0 
+                          ? `${(goals.filter(g => g.completed).length / goals.length) * 100}%` 
+                          : '0%' 
+                      }}
+                    ></div>
+                  </div>
                 </div>
               </div>
+              
+              {/* Export to Mermaid */}
+              <button
+                onClick={handleExport}
+                disabled={goals.length === 0}
+                className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+                  goals.length === 0
+                    ? 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                    : 'text-blue-600 bg-blue-50 hover:bg-blue-100 cursor-pointer'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📤</span>
+                  <span>Export to Mermaid</span>
+                </div>
+                <span className="text-sm">Copy</span>
+              </button>
+              
+
+              
+              {/* Import (placeholder for future) */}
+              <button className="w-full flex items-center justify-between p-3 rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📥</span>
+                  <span>Import</span>
+                </div>
+                <span className="text-sm">Coming Soon</span>
+              </button>
+              
+              {/* Divider */}
+              <div className="border-t border-gray-200 my-4"></div>
+              
+              {/* Reset */}
+              <button
+                onClick={() => {
+                  reset();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2 p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <span className="text-lg">🔄</span>
+                <span>Reset All Goals</span>
+              </button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Main Content - Canvas or List View */}
+      {currentView === 'list' ? (
+        renderListView()
+      ) : (
+        <div 
+          className="relative w-full h-screen overflow-hidden"
+          style={{ marginTop: '80px' }}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+        >
+          {/* Canvas Content */}
+          <div
+            ref={canvasRef}
+            className={`canvas-background relative select-none ${spacePressed || isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
+            style={{
+              width: canvasSize.width,
+              height: canvasSize.height,
+              transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)`,
+              transformOrigin: '0 0',
+              backgroundColor: 'transparent'
+            }}
+            onMouseDown={handleCanvasMouseDown}
+
+            onKeyDown={handleCanvasKeyDown}
+            onKeyUp={handleCanvasKeyUp}
+            tabIndex={0}
+          >
+            {/* Connection Lines */}
+            <ConnectionLines connections={connections} canvasSize={canvasSize} />
+            
+            {/* Goals */}
+            {goals.length === 0 ? (
+              <div 
+                className="absolute flex items-center justify-center w-96 h-32 bg-gradient-to-br from-yellow-100 to-orange-100 border-4 border-dashed border-yellow-400 rounded-2xl cursor-pointer hover:from-yellow-200 hover:to-orange-200 hover:border-yellow-500 transition-all shadow-lg"
+                style={{
+                  left: (canvasSize.width - 384) / 2,  // 384px = w-96 width  
+                  top: (canvasSize.height - 128) / 2   // 128px = h-32 height
+                }}
+                onClick={() => addRootGoal()}
+              >
+                <div className="text-center">
+                  <Target className="mx-auto mb-2 text-yellow-700" size={32} />
+                  <h2 className="text-lg font-bold text-yellow-800">What's your main goal?</h2>
+                  <p className="text-yellow-700 text-sm">Click to start breaking it down</p>
+                </div>
+              </div>
+            ) : (
+              getVisibleGoals().map(goal => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  onUpdate={updateGoal}
+                  onToggleComplete={toggleComplete}
+                  onAddSubGoal={addSubGoal}
+                  onDelete={deleteGoal}
+                  onStartEditing={startEditing}
+                  onToggleFocus={toggleFocus}
+                  isFocused={focusedGoal === goal.id}
+                  isDragged={draggedGoal?.id === goal.id}
+                  onDragStart={handleGoalDragStart}
+                />
+              ))
+            )}
+            
+
+
+          </div>
+        </div>
+      )}
+
+      {/* Floating Helper Text - appears when editing goals OR showing export messages */}
+      {(goals.some(goal => goal.isEditing) || exportMessage) && (
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-white/95 backdrop-blur-sm border border-gray-300 shadow-lg rounded-lg px-4 py-2 text-sm text-gray-700 flex items-center gap-2">
+            {goals.some(goal => goal.isEditing) ? (
+              <>
+                <span className="text-lg">💡</span>
+                <span>Press <strong>Enter</strong> to save, <strong>Esc</strong> to cancel</span>
+              </>
+            ) : (
+              <span>{exportMessage}</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default FluidGoalBreakdown;
+export default GoalBreaker;

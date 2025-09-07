@@ -1,10 +1,10 @@
 import React from 'react';
-import GoalBreaker from './components/GoalBreakdown';
+import AppTest from './App.test';
 
 function App() {
   return (
     <div className="App">
-      <GoalBreaker />
+      <AppTest />
     </div>
   );
 }

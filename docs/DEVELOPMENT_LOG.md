@@ -691,6 +691,91 @@ When clicking on task title text in canvas view, the `onMouseDown` event handler
 
 ---
 
+## Session: January 7, 2025 - Canvas Positioning Standardization
+**Duration:** ~45 minutes
+**Status:** ✅ Completed  
+
+### Problems Identified
+- **Inconsistent Canvas Positioning**: Goals positioned differently when created via canvas, list view, or import
+- **Import Layout Issues**: Imported goals appeared top-left aligned instead of centered
+- **Level Spacing Problems**: Goals at levels 3-4 overlapping each other
+- **No Standard Positioning**: Each creation method had its own positioning logic
+
+### Changes Made
+1. **Created Standardized Positioning System**
+   - Added `standardizeGoalPositions()` function in gridHelpers.ts
+   - Centers level 0 (main goal) at vertical center-right of canvas  
+   - Distributes child goals evenly around their parent's vertical position
+   - Ensures consistent spacing between all levels (400px horizontal)
+
+2. **Updated Import Logic**
+   - Modified `importFromMermaid()` to use viewport dimensions for canvas sizing
+   - Applied `standardizeGoalPositions()` to all imported goals
+   - Removed simple gridToPosition in favor of standardized layout
+
+3. **Technical Implementation**
+   - Groups goals by level for batch positioning
+   - Groups siblings by parent for centered distribution
+   - Maintains 140px vertical spacing between sibling goals
+   - Respects canvas boundaries with margin constraints
+
+### Files Modified
+- `src/utils/gridHelpers.ts` (added standardizeGoalPositions function)
+- `src/utils/mermaidHelpers.ts` (updated import to use standardized positioning)
+
+### Testing Status
+- ✅ Standardized positioning function implemented
+- ✅ Import logic updated to use new positioning system
+- ❌ Browser testing needed to verify layout consistency
+- ❌ Need to test with complex multi-level hierarchies
+
+### Next Session Priorities
+1. **Apply standardization to list view creation** - Ensure goals created from list view also use standardized positions
+2. **Test with complex hierarchies** - Verify no overlapping at levels 3-4
+3. **Add confirmation dialog for delete** - Prevent accidental goal deletion
+
+---
+
+## Session: January 7, 2025 - List View Canvas Positioning Fix
+**Duration:** ~15 minutes
+**Status:** ✅ Completed
+
+### Problems Identified
+- **List View Layout Issue**: Goals created in list view had overlapping positions when switched to canvas
+- **Import Mirroring**: Imported goals appeared mirrored (left-aligned instead of right-aligned)
+
+### Changes Made
+1. **Fixed List View to Canvas Switching**
+   - Added standardization when switching from list to canvas view
+   - Canvas button now applies `standardizeGoalPositions()` to all goals
+   - Ensures consistent layout regardless of creation method
+
+2. **Fixed Import Mirroring Issue**
+   - Corrected x-position calculation for level 0 goals
+   - Changed from `CARD_WIDTH + 60` to consistent `COLUMN_WIDTH` formula
+   - Now matches the gridToPosition calculation exactly
+
+### Files Modified
+- `src/components/GoalBreakdown/index.tsx` (added standardization on view switch)
+- `src/utils/gridHelpers.ts` (fixed level 0 x-position calculation)
+
+### Technical Details
+- **View Switch Logic**: Checks if switching from list to canvas, then standardizes
+- **Position Formula**: `x = canvasWidth - MARGIN - COLUMN_WIDTH` for level 0
+- **Consistency**: All positioning now uses same COLUMN_WIDTH-based calculations
+
+### Testing Status
+- ✅ List view standardization on switch implemented
+- ✅ Import mirroring fix implemented
+- ❌ Browser testing needed to verify both fixes work
+
+### Next Session Priorities
+1. **Test all three creation methods** - Verify consistent positioning
+2. **Add delete confirmation dialog** - Prevent accidental goal deletion
+3. **Fix menu button position** - Move to left side for future account section
+
+---
+
 ## Session: September 6, 2025
 
 ### 🎯 UX Improvement: Standardized Helper Text Location

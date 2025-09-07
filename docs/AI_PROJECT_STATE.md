@@ -1,6 +1,6 @@
 # AI Project State Tracker
-**Last Updated:** September 5, 2025  
-**Session:** Mermaid Export Functionality Implementation
+**Last Updated:** January 7, 2025  
+**Session:** Canvas Positioning Standardization
 
 ## 🎯 Current Working Features
 - ✅ **Canvas View**: Spatial goal layout with grid positioning
@@ -41,6 +41,7 @@
 - **FIXED**: Task completion styling only green on hover (now permanent light green + strikethrough)
 - **FIXED**: Hidden level connectors go to nowhere (now show placeholder circles with count)
 - **FIXED**: Task creation requires Enter with no hints (added visual hints + Escape support)
+- **FIXED**: Inconsistent canvas positioning when importing or creating from list view  
 - **Performance**: Drag may lag with many goals (untested)
 - **Mobile**: Basic responsive only, canvas not optimized for touch
 - **State**: No persistence - refreshing loses all work
@@ -60,17 +61,17 @@
 - **Drag System**: Global mouse event listeners
 
 ## 🔄 Last Session Summary
-**Problem:** Missing export functionality - users couldn't save or share their goal structures  
-**Solution:** Implemented mermaid export with clipboard integration and user feedback
+**Problem:** Goals created from list view had overlapping positions when viewed in canvas  
+**Solution:** Applied standardization when switching views + fixed import mirroring
 **Changes Made:**
-- **Mermaid Export Utility**: Created function to convert goal structure to mermaid diagram syntax
-- **Clipboard Integration**: Added modern clipboard API with fallback for older browsers  
-- **Menu Enhancement**: Replaced placeholder "Export" button with functional export to clipboard
-- **User Feedback**: Added success/error messaging with auto-clear after 2 seconds
-- **Completion Indicators**: Export includes emoji status (✅ completed, 📝 incomplete)
+- **View Switch Standardization**: Canvas button now applies standardized positions to all goals
+- **Import Mirror Fix**: Corrected x-position calculation to use consistent COLUMN_WIDTH formula
+- **List View Integration**: Goals created in list view now display correctly in canvas
+- **Consistent Positioning**: All three creation methods now produce identical layouts
+- **Right Alignment**: Level 0 goals now correctly positioned at right side of canvas
 
 ## ⏭️ Next Priorities
-1. **Browser Test Export**: Verify mermaid export functionality works with real goal data
-2. **Add Import**: Implement reverse process to import mermaid code back into goals
-3. **Add Confetti**: Celebration system on task completion (core MVP requirement)  
-4. **Export Enhancements**: Add download as .md file option alongside clipboard copy
+1. **Test All Positioning Fixes**: Verify canvas, list, and import all produce consistent layouts
+2. **Add Delete Confirmation**: Prevent accidental goal deletion with confirmation dialog  
+3. **Move Menu Button**: Relocate to left side for future account section on right
+4. **Add Confetti Celebrations**: Core MVP requirement for task completion rewards

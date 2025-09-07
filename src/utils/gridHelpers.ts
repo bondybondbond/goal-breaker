@@ -149,4 +149,77 @@ export const calculateChildPosition = (
     x: Math.max(GRID.MARGIN, x),
     y: Math.max(GRID.MARGIN, Math.min(fallbackY, canvasHeight - GRID.CARD_HEIGHT - GRID.MARGIN))
   };
-};;;
+};
+
+/**
+ * Calculate standardized positions for a complete goal hierarchy
+ * This ensures consistent positioning regardless of how goals are created
+ * @param goals - Array of goals with hierarchy info
+ * @param canvasWidth - Width of the canvas
+ * @param canvasHeight - Height of the canvas
+ * @returns Goals with standardized positions
+ */
+export const standardizeGoalPositions = (
+  goals: Goal[],
+  canvasWidth: number,
+  canvasHeight: number
+): Goal[] => {
+  // Group goals by level
+  const levelGroups = new Map<number, Goal[]>();
+  goals.forEach(goal => {
+    if (!levelGroups.has(goal.level)) {
+      levelGroups.set(goal.level, []);
+    }
+    levelGroups.get(goal.level)!.push(goal);
+  });
+  
+  // Position level 0 (main goal) at center-right of canvas
+  const level0Goals = levelGroups.get(0) || [];
+  level0Goals.forEach((goal, index) => {
+    const centerY = (canvasHeight / 2) - (GRID.CARD_HEIGHT / 2);
+    const offsetY = index * GRID.ROW_HEIGHT;
+    // Use consistent positioning formula: level 0 is at (0 + 1) * COLUMN_WIDTH from the right
+    goal.position = {
+      x: canvasWidth - GRID.MARGIN - GRID.COLUMN_WIDTH,
+      y: centerY + offsetY
+    };
+  });
+  
+  // Position each subsequent level relative to their parents
+  for (let level = 1; level <= 3; level++) {
+    const levelGoals = levelGroups.get(level) || [];
+    
+    // Group goals by parent
+    const parentGroups = new Map<number, Goal[]>();
+    levelGoals.forEach(goal => {
+      if (goal.parentId !== null) {
+        if (!parentGroups.has(goal.parentId)) {
+          parentGroups.set(goal.parentId, []);
+        }
+        parentGroups.get(goal.parentId)!.push(goal);
+      }
+    });
+    
+    // Position each group of siblings
+    parentGroups.forEach((siblings, parentId) => {
+      const parent = goals.find(g => g.id === parentId);
+      if (!parent) return;
+      
+      const x = canvasWidth - GRID.MARGIN - ((level + 1) * GRID.COLUMN_WIDTH);
+      
+      // Center siblings around parent
+      const siblingCount = siblings.length;
+      const totalHeight = siblingCount * GRID.ROW_HEIGHT;
+      const startY = parent.position.y + (GRID.CARD_HEIGHT / 2) - (totalHeight / 2);
+      
+      siblings.forEach((sibling, index) => {
+        sibling.position = {
+          x: Math.max(GRID.MARGIN, x),
+          y: Math.max(GRID.MARGIN, startY + (index * GRID.ROW_HEIGHT))
+        };
+      });
+    });
+  }
+  
+  return goals;
+};

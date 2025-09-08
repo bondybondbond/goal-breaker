@@ -810,3 +810,63 @@ Single focused change - test export functionality to confirm messages appear in 
 Test the standardized helper location, then continue with remaining canvas bugs from backlog.
 
 ---
+
+## Session: September 8, 2025 - Deployment Blank Screen Debugging
+**Duration:** ~30 minutes
+**Status:** ❌ Unresolved (To be continued)
+
+### Problems Identified
+- **Blank Screen on Vercel Deployment**: App builds successfully but shows blank screen in production
+- **Local vs Production Discrepancy**: Works perfectly in local development (`npm start`)
+- **Clean Build Logs**: No obvious errors in Vercel build process
+
+### Investigation Steps Taken
+1. **Created Minimal Test Component**
+   - Built simple blue test page to isolate React vs component issues
+   - Test worked locally but still blank on deployment
+   - Ruled out GoalBreaker component as root cause
+
+2. **Deployment Configuration Issues**
+   - Initially suspected favicon reference causing 404 errors
+   - Cleaned up `public/index.html` removing favicon references
+   - Updated title from "Fluid Goals" to "Goal Breaker"
+   - Issue persisted after deployment
+
+### Changes Made
+- ✅ **Cleaned public/index.html** - removed commented favicon references
+- ✅ **Updated title** from "Fluid Goals" to "Goal Breaker"  
+- ✅ **Created test component** for debugging isolation
+- ✅ **Full GoalBreaker component restored** for future session
+
+### Files Modified
+- `public/index.html` (cleaned up, removed favicon, updated title)
+- `src/App.test.tsx` (created minimal test component)
+- `src/App.tsx` (temporarily used test, then restored GoalBreaker)
+
+### Current Status
+- **Local Development**: ✅ Working perfectly (test shows blue page)
+- **Vercel Deployment**: ❌ Still blank screen despite clean builds
+- **Build Process**: ✅ No compilation errors, successful deployment
+- **Component**: ✅ Full GoalBreaker functionality restored
+
+### Root Cause Analysis Needed
+Since minimal test component also fails on deployment but works locally, the issue is likely:
+- Vercel build configuration problem
+- Missing environment variables
+- JavaScript runtime errors in production build
+- Tailwind CSS not loading in production
+- Browser compatibility issues in production
+
+### Next Session Action Plan
+1. **Check Browser Console Errors** - Use F12 dev tools on deployed site
+2. **Network Tab Analysis** - Check for failed resource loads  
+3. **Test Production Build Locally** - `npm run build && npx serve -s build`
+4. **Vercel Settings Review** - Check build/deployment configuration
+5. **Consider Alternative Deployment** - Test on different platform if needed
+
+### Files Ready for Next Session
+- Full GoalBreaker component restored and ready
+- Debugging memory created with investigation steps
+- Clean project structure for continued troubleshooting
+
+---

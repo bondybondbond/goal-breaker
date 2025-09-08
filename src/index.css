@@ -1,1 +1,25 @@
-@tailwind base; @tailwind components; @tailwind utilities; body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; } code { font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace; }
+@tailwind base; @tailwind components; @tailwind utilities; 
+
+body { 
+  margin: 0; 
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; 
+  -webkit-font-smoothing: antialiased; 
+  -moz-osx-font-smoothing: grayscale; 
+} 
+
+code { 
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace; 
+}
+
+/* Force cursor styles for canvas panning - override any conflicts */
+.canvas-background.cursor-grab {
+  cursor: grab !important;
+}
+
+.canvas-background.cursor-grabbing {
+  cursor: grabbing !important;
+}
+
+.canvas-background.cursor-default {
+  cursor: default !important;
+}

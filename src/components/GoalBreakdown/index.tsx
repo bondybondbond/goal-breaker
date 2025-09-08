@@ -148,8 +148,36 @@ const GoalBreaker = () => {
   };
 
   const deleteGoal = (id) => {
-    setGoals(goals.filter(goal => goal.id !== id && goal.parentId !== id));
-  };
+    const goalToDelete = goals.find(goal => goal.id === id);
+    if (!goalToDelete) return;
+    
+    // Create confirmation message based on goal type and children
+    const children = goals.filter(goal => goal.parentId === id);
+    let confirmMessage;
+    
+    if (goalToDelete.level === 0) {
+      // Main goal
+      if (children.length > 0) {
+        confirmMessage = `Are you sure you want to delete this main goal?\n\nThis will also delete ${children.length} sub-task(s).`;
+      } else {
+        confirmMessage = "Are you sure you want to delete this main goal?";
+      }
+    } else {
+      // Sub-goal
+      if (children.length > 0) {
+        confirmMessage = `Are you sure you want to delete "${goalToDelete.text || 'this task'}"?\n\nThis will also delete ${children.length} sub-task(s).`;
+      } else {
+        confirmMessage = `Are you sure you want to delete "${goalToDelete.text || 'this task'}"?`;
+      }
+    }
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm(confirmMessage);
+    
+    if (confirmed) {
+      setGoals(goals.filter(goal => goal.id !== id && goal.parentId !== id));
+    }
+  };;
 
   const reset = () => {
     setGoals([]);
@@ -357,8 +385,10 @@ const GoalBreaker = () => {
   // Canvas event handlers
 
   const handleCanvasMouseDown = (e) => {
-    // Only start panning if clicking on canvas background, not on a goal
-    if (e.target === canvasRef.current || e.target.closest('.canvas-background')) {
+    // Only middle mouse button (button 1) for panning
+    const isMiddleButton = e.button === 1;
+    
+    if (isMiddleButton) {
       setIsPanning(true);
       setPanStart({ x: e.clientX, y: e.clientY });
       e.preventDefault();
@@ -366,6 +396,7 @@ const GoalBreaker = () => {
   };
 
   const handleCanvasMouseMove = (e) => {
+    // Handle middle mouse panning
     if (isPanning) {
       const deltaX = e.clientX - panStart.x;
       const deltaY = e.clientY - panStart.y;
@@ -374,6 +405,22 @@ const GoalBreaker = () => {
         y: prev.y + deltaY
       }));
       setPanStart({ x: e.clientX, y: e.clientY });
+    }
+    
+    // Handle spacebar + mouse panning (Figma style)
+    if (spacePressed && !isPanning) {
+      if (!panStart.x && !panStart.y) {
+        // Initialize pan start position when spacebar panning begins
+        setPanStart({ x: e.clientX, y: e.clientY });
+      } else {
+        const deltaX = e.clientX - panStart.x;
+        const deltaY = e.clientY - panStart.y;
+        setCanvasOffset(prev => ({
+          x: prev.x + deltaX,
+          y: prev.y + deltaY
+        }));
+        setPanStart({ x: e.clientX, y: e.clientY });
+      }
     }
     
     // Handle goal dragging
@@ -413,6 +460,7 @@ const GoalBreaker = () => {
         return;
       }
       setSpacePressed(false);
+      setPanStart({ x: 0, y: 0 }); // Reset pan start for next spacebar use
       e.preventDefault();
     }
   };
@@ -1024,19 +1072,20 @@ graph TD
           {/* Canvas Content */}
           <div
             ref={canvasRef}
-            className={`canvas-background relative select-none ${spacePressed || isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
+            className={`canvas-background relative select-none ${isPanning ? 'cursor-grabbing' : spacePressed ? 'cursor-grab' : 'cursor-default'}`}
+            onMouseDown={handleCanvasMouseDown}
+            onKeyDown={handleCanvasKeyDown}
+            onKeyUp={handleCanvasKeyUp}
+            tabIndex={0}
             style={{
               width: canvasSize.width,
               height: canvasSize.height,
               transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)`,
               transformOrigin: '0 0',
-              backgroundColor: 'transparent'
+              backgroundColor: 'transparent',
+              outline: 'none', // Remove focus outline border
+              cursor: isPanning ? 'grabbing !important' : spacePressed ? 'grab !important' : 'default !important'
             }}
-            onMouseDown={handleCanvasMouseDown}
-
-            onKeyDown={handleCanvasKeyDown}
-            onKeyUp={handleCanvasKeyUp}
-            tabIndex={0}
           >
             {/* Connection Lines */}
             <ConnectionLines connections={connections} canvasSize={canvasSize} />
@@ -1081,14 +1130,21 @@ graph TD
         </div>
       )}
 
-      {/* Floating Helper Text - appears when editing goals OR showing export messages */}
-      {(goals.some(goal => goal.isEditing) || exportMessage) && (
+      {/* Floating Helper Text - appears when editing goals, showing export messages, or navigation help */}
+      {(goals.some(goal => goal.isEditing) || exportMessage || spacePressed || isPanning) && (
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-white/95 backdrop-blur-sm border border-gray-300 shadow-lg rounded-lg px-4 py-2 text-sm text-gray-700 flex items-center gap-2">
             {goals.some(goal => goal.isEditing) ? (
               <>
                 <span className="text-lg">💡</span>
                 <span>Press <strong>Enter</strong> to save, <strong>Esc</strong> to cancel</span>
+              </>
+            ) : (spacePressed || isPanning) ? (
+              <>
+                <span className="text-lg">🖱️</span>
+                <span>
+                  Hold <strong>Spacebar</strong> or <strong>Middle mouse button</strong> + drag to pan
+                </span>
               </>
             ) : (
               <span>{exportMessage}</span>

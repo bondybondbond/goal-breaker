@@ -4,6 +4,10 @@ import { ConnectionLines } from '../ConnectionLines';
 import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition, standardizeGoalPositions } from '../../utils/gridHelpers';
 import { getLevelStyle, getLevelStats, getLevelLabel } from '../../utils/styleHelpers';
 import { exportToMermaid, copyToClipboard, importFromMermaid } from '../../utils/mermaidHelpers';
+import ConfettiCelebration from '../ConfettiCelebration';
+
+// Types for celebration system
+type CelebrationType = 'humble' | 'nice' | 'awesome' | 'epic';
 
 const GoalBreaker = () => {
   const [goals, setGoals] = useState([]);
@@ -24,6 +28,16 @@ const GoalBreaker = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importMessage, setImportMessage] = useState('');
+  
+  // Celebration state - visual only, no messages
+  const [celebration, setCelebration] = useState<{
+    isVisible: boolean;
+    type: CelebrationType;
+  }>({
+    isVisible: false,
+    type: 'humble'
+  });
+  
   const canvasRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ 
     width: window.innerWidth, 
@@ -122,6 +136,28 @@ const GoalBreaker = () => {
   // Calculate existing levels from goals array
   const existingLevels = [...new Set(goals.map(goal => goal.level))].sort();
 
+  // Celebration type logic - purely visual, escalating spectacle
+  const getCelebrationType = (goal): CelebrationType => {
+    // EPIC: Main goals (level 0) - rocket launch! 🚀
+    if (goal.level === 0) {
+      return 'epic';
+    }
+    
+    // AWESOME: Goals with children (bigger impact) - confetti rain 🎉
+    const hasChildren = goals.some(g => g.parentId === goal.id);
+    if (hasChildren) {
+      return 'awesome';
+    }
+    
+    // NICE: Regular sub-goals - high five burst 🙌
+    if (goal.level === 1) {
+      return 'nice';
+    }
+    
+    // HUMBLE: Deep nested tasks - simple thumbs up 👍
+    return 'humble';
+  };
+
   // Goal management functions
   const updateGoal = (id, newText) => {
     setGoals(goals.map(goal => 
@@ -140,11 +176,28 @@ const GoalBreaker = () => {
   };
 
   const toggleComplete = (id) => {
+    const goal = goals.find(g => g.id === id);
+    if (!goal) return;
+    
+    const wasCompleted = goal.completed;
+    const willBeCompleted = !wasCompleted;
+    
+    // Update the goal
     setGoals(goals.map(goal => 
       goal.id === id 
         ? { ...goal, completed: !goal.completed }
         : goal
     ));
+    
+    // Trigger celebration only when completing (not uncompleting)
+    if (willBeCompleted) {
+      const celebrationType = getCelebrationType(goal);
+      
+      setCelebration({
+        isVisible: true,
+        type: celebrationType
+      });
+    }
   };
 
   const deleteGoal = (id) => {
@@ -319,6 +372,13 @@ const GoalBreaker = () => {
 
   const toggleFocus = (goalId) => {
     setFocusedGoal(focusedGoal === goalId ? null : goalId);
+  };
+
+  const handleCelebrationComplete = () => {
+    setCelebration({
+      isVisible: false,
+      type: 'humble'
+    });
   };
 
   // Get visible goals based on focus and hidden levels
@@ -1152,6 +1212,13 @@ graph TD
           </div>
         </div>
       )}
+
+      {/* Confetti Celebration */}
+      <ConfettiCelebration 
+        isVisible={celebration.isVisible}
+        type={celebration.type}
+        onComplete={handleCelebrationComplete}
+      />
     </div>
   );
 };

@@ -962,7 +962,16 @@ const GoalBreaker = () => {
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
         <div className="flex justify-between items-center px-6 py-4">
-          <div className="flex items-center gap-6">
+          {/* Left side: Menu button and Logo */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+            >
+              <Menu size={20} />
+              <span>Menu</span>
+            </button>
+            
             <div className="flex items-center gap-3">
               <Target className="text-yellow-600" size={24} />
               <h1 className="text-xl font-bold text-gray-800">Goal Breaker</h1>
@@ -972,7 +981,16 @@ const GoalBreaker = () => {
                 </div>
               )}
             </div>
+          </div>
 
+          {/* Right side: Controls and placeholders */}
+          <div className="flex items-center gap-4">
+            {/* Directions button placeholder */}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">↔️ Directions</span>
+              <span className="text-green-500 font-medium">right to left</span>
+            </div>
+            
             {/* View Toggle */}
             <div className="flex items-center bg-white rounded-lg p-1 shadow-lg border border-gray-200">
               <button
@@ -1004,43 +1022,14 @@ const GoalBreaker = () => {
               </button>
             </div>
 
-            {/* Level Navigation */}
-            {existingLevels.length > 1 && (
-              <div className="flex items-center gap-2 bg-white rounded-xl p-2 shadow-lg border border-gray-200">
-                {existingLevels.map(level => {
-                  const stats = getLevelStats(level, goals);
-                  const isHidden = hiddenLevels.has(level);
-                  const levelStyle = getLevelStyle(level, false);
-                  
-                  return (
-                    <button
-                      key={level}
-                      onClick={() => toggleLevelVisibility(level)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-300 transform hover:scale-105 text-sm ${
-                        isHidden 
-                          ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' 
-                          : `${levelStyle.bg} ${levelStyle.color} ${levelStyle.border} ${levelStyle.borderWidth}`
-                      }`}
-                    >
-                      {isHidden ? <EyeOff size={12} /> : <Eye size={12} />}
-                      <span className="font-medium">{getLevelLabel(level)}</span>
-                      <span className="text-xs bg-white px-2 py-0.5 rounded-full">
-                        {stats.completed}/{stats.total}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+            {/* Share placeholder */}
+            <button className="px-4 py-2 rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed transition-colors">
+              🔗 share
+            </button>
 
-          <div className="flex items-center">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
-            >
-              <span>Menu</span>
-              <Menu size={20} />
+            {/* Sign in to save placeholder */}
+            <button className="px-4 py-2 rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed transition-colors">
+              👤 save
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition, stand
 import { getLevelStyle, getLevelStats, getLevelLabel } from '../../utils/styleHelpers';
 import { exportToMermaid, copyToClipboard, importFromMermaid } from '../../utils/mermaidHelpers';
 import ConfettiCelebration from '../ConfettiCelebration';
+import GoalCardMenu from '../GoalCardMenu';
 
 // Types for celebration system
 type CelebrationType = 'humble' | 'nice' | 'awesome' | 'epic';
@@ -19,6 +20,7 @@ const GoalBreaker = () => {
   const [connections, setConnections] = useState([]);
   const [hiddenLevels, setHiddenLevels] = useState(new Set());
   const [focusedGoal, setFocusedGoal] = useState(null);
+  const [selectedGoal, setSelectedGoal] = useState(null); // Track which card shows navigation buttons
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -360,6 +362,51 @@ const GoalBreaker = () => {
     setGoals(prev => [...prev, newGoal]);
   };
 
+  const addSiblingGoal = (goalId) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    // Get existing siblings at same level with same parent
+    const existingSiblings = goals.filter(g => 
+      g.parentId === goal.parentId && 
+      g.level === goal.level && 
+      g.id !== goalId
+    );
+    
+    const newId = Math.max(0, ...goals.map(g => g.id), 0) + 1;
+    
+    // Find the lowest Y position among siblings to place new sibling below
+    const allSameLevelGoals = [...existingSiblings, goal];
+    const maxY = Math.max(...allSameLevelGoals.map(g => g.position.y));
+    
+    // Position new sibling below the lowest sibling with proper spacing
+    const newPosition = {
+      x: goal.position.x, // Same X as siblings
+      y: maxY + GRID.CARD_HEIGHT + GRID.VERTICAL_GAP
+    };
+
+    const newGoal = {
+      id: newId,
+      text: '',
+      completed: false,
+      level: goal.level,
+      gridRow: existingSiblings.length + 1,
+      parentId: goal.parentId,
+      position: newPosition,
+      isEditing: true,
+      children: []
+    };
+
+    setGoals(prev => {
+      const updatedGoals = [...prev, newGoal];
+      // Force a re-render to ensure connectors update
+      setTimeout(() => {
+        setGoals(current => [...current]);
+      }, 10);
+      return updatedGoals;
+    });
+  };
+
   const toggleLevelVisibility = (level) => {
     const newHidden = new Set(hiddenLevels);
     if (newHidden.has(level)) {
@@ -445,8 +492,16 @@ const GoalBreaker = () => {
   // Canvas event handlers
 
   const handleCanvasMouseDown = (e) => {
-    // Only middle mouse button (button 1) for panning
+    // Left click (button 0) to clear selection when clicking on canvas background
+    const isLeftButton = e.button === 0;
     const isMiddleButton = e.button === 1;
+    
+    if (isLeftButton) {
+      // Check if clicking on canvas background (not on a goal card)
+      if (e.target === e.currentTarget) {
+        setSelectedGoal(null);
+      }
+    }
     
     if (isMiddleButton) {
       setIsPanning(true);
@@ -547,8 +602,21 @@ const GoalBreaker = () => {
   };
 
   // GoalCard component
-  const GoalCard = ({ goal, onUpdate, onToggleComplete, onAddSubGoal, onDelete, onStartEditing, onToggleFocus, isFocused, isDragged, onDragStart }) => {
+  const GoalCard = ({ goal, onUpdate, onToggleComplete, onAddSubGoal, onAddSiblingGoal, onDelete, onStartEditing, onToggleFocus, isFocused, isDragged, onDragStart, isSelected, onSelect }) => {
     const levelStyle = getLevelStyle(goal.level, goal.completed);
+    
+    // Get the appropriate color for selection based on level
+    const selectionColors = [
+      { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-600' }, // Level 0
+      { bg: 'bg-blue-500', hover: 'hover:bg-blue-600' },     // Level 1
+      { bg: 'bg-purple-500', hover: 'hover:bg-purple-600' },  // Level 2
+      { bg: 'bg-green-500', hover: 'hover:bg-green-600' },    // Level 3
+      { bg: 'bg-orange-500', hover: 'hover:bg-orange-600' },  // Level 4
+      { bg: 'bg-pink-500', hover: 'hover:bg-pink-600' },     // Level 5
+      { bg: 'bg-red-500', hover: 'hover:bg-red-600' },       // Level 6
+      { bg: 'bg-indigo-600', hover: 'hover:bg-indigo-700' }   // Level 7+
+    ];
+    const selectionColor = selectionColors[Math.min(goal.level, selectionColors.length - 1)];
     
     const handleMouseDown = (e) => {
       // Only start dragging if not clicking on interactive elements or their children
@@ -556,10 +624,9 @@ const GoalBreaker = () => {
       const isButton = target.tagName === 'BUTTON' || target.closest('button');
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
       const isSvg = target.tagName === 'svg' || target.tagName === 'SVG';
-      const isText = target.tagName === 'P' || target.closest('p'); // Add text paragraph check
       
-      if (isButton || isInput || isSvg || isText) {
-        return; // Don't start drag on interactive elements or text
+      if (isButton || isInput || isSvg) {
+        return; // Don't start drag on interactive elements
       }
       
       // Don't start drag if goal is in editing mode
@@ -567,117 +634,136 @@ const GoalBreaker = () => {
         return;
       }
       
-      onDragStart(goal, e);
+      // Store initial mouse position to detect if this is a click vs drag
+      const startX = e.clientX;
+      const startY = e.clientY;
+      
+      const handleMouseMove = (moveEvent) => {
+        const deltaX = Math.abs(moveEvent.clientX - startX);
+        const deltaY = Math.abs(moveEvent.clientY - startY);
+        
+        // If mouse moved more than 5 pixels, start dragging
+        if (deltaX > 5 || deltaY > 5) {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          onDragStart(goal, e);
+        }
+      };
+      
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        // This was a click, not a drag - select the card
+        onSelect(goal.id);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     };
+    
+
     
     return (
       <div
-        className={`absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl cursor-move ${levelStyle.border} ${levelStyle.borderWidth} ${
+        className={`absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl cursor-move ${
           goal.completed ? 'bg-green-100' : levelStyle.bg
         } ${
           isDragged ? 'scale-105 rotate-2 z-50' : ''
-        } ${isFocused ? 'ring-4 ring-blue-300' : ''}`}
+        } ${isFocused ? 'ring-4 ring-blue-300' : ''} ${
+          isSelected 
+            ? `border-2 ${selectionColor.bg.replace('bg-', 'border-')}` 
+            : 'border border-gray-200'
+        }`}
         style={{
           left: goal.position.x,
           top: goal.position.y,
           width: GRID.CARD_WIDTH,
           height: GRID.CARD_HEIGHT,
-          zIndex: isDragged ? 50 : isFocused ? 30 : 10,
+          zIndex: isDragged ? 50 : isSelected ? 40 : isFocused ? 30 : 10,
           userSelect: 'none'
         }}
+
         onMouseDown={handleMouseDown}
       >
-        <div className="p-4 h-full flex flex-col">
-          {/* Card Header */}
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onToggleComplete(goal.id);
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                className={`p-1.5 rounded-full transition-all cursor-pointer ${
-                  goal.completed 
-                    ? 'bg-green-500 text-white scale-110' 
-                    : 'bg-gray-100 border-2 border-gray-300 hover:border-green-400 hover:bg-green-50'
-                }`}
-              >
-                <Check size={12} />
-              </button>
-              
+        {/* Hierarchy level indicator bar at top - always visible */}
+        <div 
+          className={`absolute top-0 left-0 right-0 h-2 ${selectionColor.bg} rounded-t-xl`}
+        />
+        
 
-            </div>
-
-            <div className="flex items-center gap-1">
+        
+        {/* Navigation buttons on hover only */}
+        {isSelected && (
+          <>
+            {/* Add Child Button (Left side) - Next Level */}
+            <div className="absolute -left-10 top-1/2 -translate-y-1/2 z-50">
               <button
+                className={`w-6 h-6 ${selectionColor.bg} ${selectionColor.hover} text-white rounded-lg shadow-lg flex items-center justify-center transition-all hover:scale-110 hover:shadow-xl group relative`}
                 onClick={(e) => {
-                  e.preventDefault();
                   e.stopPropagation();
-                  onToggleFocus(goal.id);
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                className={`p-1.5 rounded-full transition-all cursor-pointer ${
-                  isFocused 
-                    ? 'bg-blue-500 text-white' 
-                    : 'text-gray-400 hover:bg-gray-100 hover:text-blue-500'
-                }`}
-              >
-                <Focus size={12} />
-              </button>
-              
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('Add subgoal clicked for goal:', goal.id);
                   onAddSubGoal(goal.id);
                 }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                className="p-1.5 rounded-full text-purple-500 hover:bg-purple-100 transition-all cursor-pointer"
+                title="Add child goal (next level)"
               >
-                <Plus size={12} />
+                <Plus size={12} strokeWidth={2.5} />
+                {/* Tooltip below */}
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  Add Child
+                  <div className="text-[10px] text-gray-300">Next level</div>
+                </div>
               </button>
-              
-              {goal.level > 0 && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Delete goal clicked for goal:', goal.id);
-                    onDelete(goal.id);
-                  }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  className="p-1.5 rounded-full text-red-500 hover:bg-red-100 transition-all cursor-pointer"
-                >
-                  <X size={12} />
-                </button>
-              )}
             </div>
+            
+            {/* Add Sibling Button (Bottom) - Same Level - Only for non-ultimate goals */}
+            {goal.level > 0 && (
+              <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 z-50">
+                <button
+                  className={`w-6 h-6 ${selectionColor.bg} ${selectionColor.hover} text-white rounded-lg shadow-lg flex items-center justify-center transition-all hover:scale-110 hover:shadow-xl group relative`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddSiblingGoal(goal.id);
+                  }}
+                  title="Add sibling goal (same level)"
+                >
+                  <Plus size={12} strokeWidth={2.5} />
+                  {/* Tooltip below */}
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    Add Sibling
+                    <div className="text-[10px] text-gray-300">Same level</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </>
+        )}
+        
+        <div className="pt-2 px-4 pb-4 h-full flex flex-col relative">
+          {/* Three-dots menu aligned with text line */}
+          <div className="absolute top-4 right-2 z-10">
+            <GoalCardMenu
+              onComplete={() => onToggleComplete(goal.id)}
+              onRemove={() => goal.level > 0 && onDelete(goal.id)}
+              onFocus={() => onToggleFocus(goal.id)}
+              isCompleted={goal.completed}
+              isFocused={isFocused}
+            />
           </div>
-
-          {/* Card Content */}
-          <div className="flex-1 flex items-center">
+          
+          {/* Text content area */}
+          <div className="flex-1 flex items-center justify-center pr-8">
             {goal.isEditing ? (
-              <div className="relative w-full h-full">
+              <div className="relative flex-1 h-full flex items-center">
                 <textarea
                   defaultValue={goal.text}
-                  className="w-full h-full p-2 border border-blue-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+                  className="w-full h-full p-2 border-0 bg-transparent resize-none focus:outline-none text-xl font-bold text-gray-800"
                   placeholder={goal.level === 0 ? "What's your main goal?" : "Describe this task..."}
                   autoFocus
+                  ref={(textarea) => {
+                    if (textarea) {
+                      textarea.focus();
+                      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       if (e.target.value.trim()) {
@@ -711,11 +797,13 @@ const GoalBreaker = () => {
               </div>
             ) : (
               <p 
-                className={`w-full text-sm cursor-text p-2 rounded-lg transition-colors ${
-                  goal.completed ? 'line-through text-green-700' : `hover:bg-gray-200 ${levelStyle.color}`
-                } ${goal.level === 0 ? 'font-bold' : 'font-medium'}`}
+                className={`flex-1 text-xl cursor-text p-2 rounded-lg transition-colors font-bold text-center ${
+                  goal.completed ? 'line-through text-green-700' : 'hover:bg-gray-200 text-gray-800'
+                }`}
                 onClick={(e) => {
                   e.stopPropagation();
+                  // Select card first, then start editing
+                  onSelect(goal.id);
                   onStartEditing(goal.id);
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -1094,7 +1182,7 @@ graph TD
                 <ul className="text-xs text-blue-600 space-y-1">
                   <li>• Must start with "graph TD"</li>
                   <li>• Use format: A["Task Name"] or A["✅ Completed Task"]</li>
-                  <li>• Connections: A --> B</li>
+                  <li>• Connections: A --&gt; B</li>
                   <li>• Maximum 4 levels deep</li>
                 </ul>
               </div>
@@ -1174,12 +1262,15 @@ graph TD
                   onUpdate={updateGoal}
                   onToggleComplete={toggleComplete}
                   onAddSubGoal={addSubGoal}
+                  onAddSiblingGoal={addSiblingGoal}
                   onDelete={deleteGoal}
                   onStartEditing={startEditing}
                   onToggleFocus={toggleFocus}
                   isFocused={focusedGoal === goal.id}
                   isDragged={draggedGoal?.id === goal.id}
                   onDragStart={handleGoalDragStart}
+                  isSelected={selectedGoal === goal.id}
+                  onSelect={setSelectedGoal}
                 />
               ))
             )}

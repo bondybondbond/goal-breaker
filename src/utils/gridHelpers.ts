@@ -5,7 +5,8 @@ export const GRID: GridConfig = {
   ROW_HEIGHT: 140,
   CARD_WIDTH: 320,
   CARD_HEIGHT: 120,
-  MARGIN: 40
+  MARGIN: 40,
+  VERTICAL_GAP: 20
 };
 
 // Convert grid coordinates to pixel position

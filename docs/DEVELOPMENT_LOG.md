@@ -870,3 +870,49 @@ Since minimal test component also fails on deployment but works locally, the iss
 - Clean project structure for continued troubleshooting
 
 ---
+
+## Session 15: January 7, 2025 - Deployment Fix & Issue Analysis
+**Duration:** ~20 minutes
+**Status:** ✅ Completed
+
+### Problems Identified
+- **Critical Deployment Issue**: App shows blank screen on Vercel but works locally
+- **Build Script Issue**: Non-standard build command in package.json
+- **Vercel Config Conflict**: Custom vercel.json configuration causing issues
+
+### Changes Made
+1. **Fixed Build Script**
+   - Changed from `"node node_modules/react-scripts/bin/react-scripts.js build"` 
+   - To standard: `"react-scripts build"`
+   - Removes potential path resolution issues on Vercel
+
+2. **Updated Vercel Configuration**
+   - Simplified vercel.json to use standard Create React App settings
+   - Added explicit framework detection: `"framework": "create-react-app"`
+   - Removed custom build configuration that might conflict
+
+### Files Modified
+- `package.json` (fixed build script)
+- `vercel.json` (simplified configuration for CRA)
+- `docs/AI_PROJECT_STATE.md` (updated known issues)
+
+### Root Cause Analysis
+The custom build path was likely added to fix a local issue but causes problems in Vercel's build environment where paths may differ.
+
+### Testing Status
+- ✅ Build script standardized
+- ✅ Vercel configuration optimized for Create React App
+- ❌ Needs deployment to verify fix works
+
+### Next Priority Issues Identified
+1. **Canvas Navigation Bug**: Middle mouse on goal card moves both canvas and card
+2. **Connector Alignment**: List view → canvas view connector misalignment  
+3. **Menu Position**: Move to left for future accounts section
+4. **Missing Feature**: No save functionality - users lose work on refresh
+
+### Deployment Instructions
+1. Commit changes: `git add . && git commit -m "Fix deployment blank screen issue"`
+2. Push to GitHub: `git push`
+3. Vercel will auto-deploy - check if blank screen is fixed
+
+---

@@ -31,6 +31,10 @@ const GoalBreaker = () => {
   const [importText, setImportText] = useState('');
   const [importMessage, setImportMessage] = useState('');
   
+  // Directions state
+  const [currentDirection, setCurrentDirection] = useState('right-to-left');
+  const [isDirectionsOpen, setIsDirectionsOpen] = useState(false);
+  
   // Celebration state - visual only, no messages
   const [celebration, setCelebration] = useState<{
     isVisible: boolean;
@@ -69,6 +73,21 @@ const GoalBreaker = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Close directions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (isDirectionsOpen && !e.target.closest('[data-directions-dropdown]')) {
+        setIsDirectionsOpen(false);
+      }
+      if (isMenuOpen && !e.target.closest('[data-menu-dropdown]')) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isDirectionsOpen, isMenuOpen]);
 
   useEffect(() => {
     const newConnections = [];
@@ -829,149 +848,6 @@ const GoalBreaker = () => {
             className={`flex items-center gap-3 p-3 rounded-lg border-2 ${levelStyle.border} ${levelStyle.bg} transition-all hover:shadow-md`}
             style={{ marginLeft: `${depth * 24}px` }}
           >
-            <button
-              onClick={() => toggleComplete(goal.id)}
-              className={`p-1 rounded transition-colors ${
-                goal.completed 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-white border-2 border-gray-300 hover:border-green-400'
-              }`}
-            >
-              <Check size={14} />
-            </button>
-            
-            {goal.isEditing ? (
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  defaultValue={goal.text}
-                  className="w-full p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-                  placeholder={goal.level === 0 ? "What's your main goal?" : "Enter task..."}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      if (e.target.value.trim()) {
-                        updateGoal(goal.id, e.target.value);
-                      }
-                    }
-                    if (e.key === 'Escape') {
-                      if (goal.level > 0 && !goal.text) {
-                        deleteGoal(goal.id);
-                      } else {
-                        updateGoal(goal.id, goal.text || '');
-                      }
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const value = e.target.value.trim();
-                    if (value) {
-                      updateGoal(goal.id, value);
-                    } else if (goal.level > 0) {
-                      deleteGoal(goal.id);
-                    } else {
-                      updateGoal(goal.id, '');
-                    }
-                  }}
-                />
-
-              </div>
-            ) : (
-              <p 
-                className={`flex-1 cursor-pointer p-2 rounded transition-colors ${
-                  goal.completed ? 'line-through text-green-700' : `hover:bg-gray-200 ${levelStyle.color}`
-                } ${goal.level === 0 ? 'font-bold text-lg' : 'font-medium'}`}
-                onClick={() => startEditing(goal.id)}
-              >
-                {goal.text || (goal.level === 0 ? "Click to define your main goal..." : "Click to add task...")}
-              </p>
-            )}
-            
-            <div className="flex gap-2">
-              <button
-                onClick={() => addSubGoal(goal.id)}
-                className="text-purple-600 hover:bg-purple-100 p-1 rounded"
-              >
-                <Plus size={16} />
-              </button>
-              
-              {goal.level > 0 && (
-                <button
-                  onClick={() => deleteGoal(goal.id)}
-                  className="text-red-600 hover:bg-red-100 p-1 rounded"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {children.length > 0 && (
-            <div className="space-y-2">
-              {children.map(child => renderGoalItem(child, depth + 1))}
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    return (
-      <div className="p-6 max-w-4xl mx-auto" style={{ marginTop: '80px' }}>
-        <div className="space-y-4">
-          {goals.length === 0 ? (
-            <div 
-              className="p-6 border-4 border-dashed border-yellow-300 rounded-xl text-center cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 transition-colors"
-              onClick={() => {
-                const newGoal = {
-                  id: 1,
-                  text: '',
-                  completed: false,
-                  level: 0,
-                  gridRow: 0,
-                  parentId: null,
-                  position: {
-                    x: (canvasSize.width - GRID.CARD_WIDTH) / 2,
-                    y: (canvasSize.height - GRID.CARD_HEIGHT) / 2
-                  },
-                  children: [],
-                  isEditing: true
-                };
-                setGoals([newGoal]);
-              }}
-            >
-              <Target className="mx-auto mb-3 text-yellow-600" size={48} />
-              <h2 className="text-xl font-bold text-yellow-800 mb-2">Start Breaking Down Your Goal</h2>
-              <p className="text-yellow-700">Click here to define your main goal and start breaking it down</p>
-            </div>
-          ) : (
-            goals
-              .filter(goal => goal.level === 0)
-              .map(rootGoal => renderGoalItem(rootGoal))
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Component logic - should be inside the main component function
-  if (!isStarted) {
-    return <div>Loading...</div>;
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-        <div className="flex justify-between items-center px-6 py-4">
-          {/* Left side: Menu button and Logo */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
-            >
-              <Menu size={20} />
-              <span>Menu</span>
-            </button>
-            
             <div className="flex items-center gap-3">
               <Target className="text-yellow-600" size={24} />
               <h1 className="text-xl font-bold text-gray-800">Goal Breaker</h1>
@@ -981,14 +857,88 @@ const GoalBreaker = () => {
                 </div>
               )}
             </div>
+            
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+              data-menu-dropdown
+            >
+              <Menu size={20} />
+              <span>Menu</span>
+            </button>
+              )}
+            </div>
           </div>
 
           {/* Right side: Controls and placeholders */}
           <div className="flex items-center gap-4">
-            {/* Directions button placeholder */}
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500">↔️ Directions</span>
-              <span className="text-green-500 font-medium">right to left</span>
+            {/* Directions dropdown */}
+            <div className="relative" data-directions-dropdown>
+              <button
+                onClick={() => setIsDirectionsOpen(!isDirectionsOpen)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium border border-gray-200"
+              >
+                <span>↔️ Directions</span>
+                <span className="text-green-500 font-medium">
+                  {currentDirection === 'right-to-left' && '← right to left'}
+                  {currentDirection === 'top-to-bottom' && '↓ top to down'}
+                  {currentDirection === 'left-to-right' && '→ left to right'}
+                </span>
+                <span className={`transform transition-transform ${isDirectionsOpen ? 'rotate-180' : ''}`}>▼</span>
+              </button>
+              
+              {/* Directions dropdown menu */}
+              {isDirectionsOpen && (
+                <div className="absolute top-full mt-2 left-0 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                  <button
+                    onClick={() => {
+                      setCurrentDirection('right-to-left');
+                      setIsDirectionsOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-3 ${
+                      currentDirection === 'right-to-left' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <span className="text-lg">🔷</span>
+                    <div>
+                      <div className="font-medium">← right to left</div>
+                      <div className="text-sm text-gray-500">Goals flow from right to left</div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setCurrentDirection('top-to-bottom');
+                      setIsDirectionsOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-3 ${
+                      currentDirection === 'top-to-bottom' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <span className="text-lg">🔷</span>
+                    <div>
+                      <div className="font-medium">↓ top to down</div>
+                      <div className="text-sm text-gray-500">Goals flow from top to bottom</div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setCurrentDirection('left-to-right');
+                      setIsDirectionsOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-3 ${
+                      currentDirection === 'left-to-right' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <span className="text-lg">🔷</span>
+                    <div>
+                      <div className="font-medium">→ left to right</div>
+                      <div className="text-sm text-gray-500">Goals flow from left to right</div>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
             
             {/* View Toggle */}
@@ -1039,7 +989,8 @@ const GoalBreaker = () => {
       {isMenuOpen && (
         <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}>
           <div className="absolute top-20 right-6 w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
-               onClick={(e) => e.stopPropagation()}>
+               onClick={(e) => e.stopPropagation()}
+               data-menu-dropdown>
             {/* Menu Header */}
             <div className="flex justify-between items-center p-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-800">Goal Breaker</h3>

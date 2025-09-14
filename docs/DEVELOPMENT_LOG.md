@@ -888,6 +888,69 @@ From build logs analysis of failed deployment `dpl_Azi4J1eadGMGANkQgRWiRRUSKv3a`
 
 ---
 
+## Session 17: September 14, 2025 - JSX Structure Organization & React Fragments
+**Duration:** ~15 minutes  
+**Status:** ✅ Completed
+
+### Goals Achieved
+- **Future-Proof JSX Structure**: Organized components into clear, labeled sections for easy future development
+- **React Fragment Implementation**: Properly wrapped related components to prevent JSX level issues
+- **Developer Experience**: Made component structure obvious for non-coders
+
+### Changes Made
+1. **Clear Section Organization**
+   - Added descriptive comments for each major section:
+     - `{/* ===== HEADER SECTION ===== }`
+     - `{/* ===== OVERLAY COMPONENTS ===== }`
+     - `{/* ===== MAIN CONTENT AREA ===== }`
+     - `{/* ===== FLOATING UI ELEMENTS ===== }`
+     - `{/* ===== FUTURE COMPONENTS SLOT ===== }`
+
+2. **React Fragment Wrapping**
+   - Wrapped overlay components (menu, import modal) in `<React.Fragment>`
+   - Wrapped floating UI elements (helper text, confetti) in `<React.Fragment>`
+   - Prevents future JSX level issues when adding new components
+
+3. **Developer Guidelines Embedded**
+   - Clear instructions where to add new features:
+     - New modals/overlays → OVERLAY COMPONENTS section
+     - New floating notifications → FLOATING UI ELEMENTS section
+     - Completely new features → FUTURE COMPONENTS SLOT
+
+### Files Modified
+- `src/components/GoalBreakdown/index.tsx` (complete structural reorganization with comments)
+
+### Technical Benefits
+- **No JSX Level Issues**: React Fragments prevent multiple adjacent elements problems
+- **Clear Component Homes**: Every new feature has an obvious place to go
+- **Easy Maintenance**: Comments make structure immediately obvious to any developer
+- **Scalable Architecture**: Structure can grow without becoming messy
+
+### User Experience Impact
+- **Zero Breaking Changes**: All functionality preserved exactly as before
+- **Same Performance**: No runtime impact, purely organizational
+- **Better Debugging**: Clear structure makes troubleshooting easier
+
+### Testing Status
+- ✅ App confirmed working after reorganization
+- ✅ All functionality preserved (user tested)
+- ✅ No compilation errors
+- ✅ Structure ready for future development
+
+### Developer Education Notes
+**For future AI coding sessions:**
+- Always use React Fragments (`<>...</>`) to wrap multiple JSX elements
+- Follow the established section comments when adding new features
+- Never place components outside their designated sections
+- This structure eliminates the "JSX elements must be wrapped" compilation errors
+
+### Next Session Priorities
+1. **Continue with bug fixes** - Structure is now solid for tackling the backlog
+2. **Add confetti celebrations** - Core MVP requirement still missing
+3. **Fix canvas navigation bugs** - Middle mouse button improvements
+
+---
+
 ## Session 15: January 7, 2025 - Deployment Fix & Issue Analysis
 **Duration:** ~20 minutes
 **Status:** ✅ Completed

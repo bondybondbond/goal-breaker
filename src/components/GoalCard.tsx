@@ -53,6 +53,12 @@ const GoalCard: React.FC<GoalCardProps> = ({
   const selectionColor = selectionColors[Math.min(goal.level, selectionColors.length - 1)];
   
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Only handle left mouse button (button 0) for dragging
+    // Let middle mouse button (button 1) bubble up to canvas for panning
+    if (e.button !== 0) {
+      return; // Allow middle mouse and right mouse to bubble up
+    }
+    
     // Only start dragging if not clicking on interactive elements or their children
     const target = e.target as HTMLElement;
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
@@ -255,12 +261,12 @@ const GoalCard: React.FC<GoalCardProps> = ({
         </div>
         
         {/* Text content area */}
-        <div className="flex-1 flex items-center justify-center pr-8">
+        <div className="flex-1 flex items-center justify-center pr-2">
           {goal.isEditing ? (
-            <div className="relative flex-1 h-full flex items-center">
+            <div className="relative flex-1 h-full flex items-center px-1">
               <textarea
                 defaultValue={goal.text}
-                className="w-full h-full p-2 border-0 bg-transparent resize-none focus:outline-none text-xl font-bold text-gray-800"
+                className="w-full h-full px-2 py-1 border-0 bg-gray-100 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-300 text-xl font-bold text-gray-800"
                 placeholder={goal.level === 0 ? "What's your main goal?" : "Describe this task..."}
                 autoFocus
                 ref={(textarea) => {

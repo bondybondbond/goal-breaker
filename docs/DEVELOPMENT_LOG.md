@@ -1254,3 +1254,108 @@ React state updates are asynchronous. When switching views or directions:
 3. **Add Missing Core Features** - Confetti celebrations, save functionality
 
 ---
+
+## Session 22: September 15, 2025 - Master Collision-Free Positioning System (Phase 1)
+**Duration:** ~60 minutes  
+**Status:** 🔄 In Progress
+
+### Problems Being Solved
+- **Multiple Overlapping Functions**: `redistributeChildren()`, `calculateChildPosition()`, `addSiblingGoal()`, `standardizeGoalPositions()` all try to position cards differently
+- **Edge Case Overlaps**: Cards still overlap in complex scenarios despite existing logic
+- **Inconsistent Behavior**: Different card creation methods produce different positioning results
+- **Future Drag-Drop Blocker**: Current system not sustainable for drag-and-drop hierarchy changes
+
+### Master Solution Strategy
+**Replace ALL positioning logic with ONE bulletproof function**: `positionGoalSafely()`
+
+This master function will:
+1. ✅ **Use collision detection** - Never allow overlaps, period
+2. ✅ **Handle all positioning needs** - Children, siblings, repositioning, drag-drop
+3. ✅ **Work with any scenario** - 1 child, 10 children, complex hierarchies
+4. ✅ **Future-proof for drag-drop** - Ready for manual hierarchy changes
+5. ✅ **Eliminate redundant code** - Replace 4+ functions with 1 master function
+
+### Technical Architecture
+**Master Function Signature:**
+```typescript
+positionGoalSafely(
+  goalToPosition: Goal,
+  relationship: 'child-of' | 'sibling-of' | 'root',
+  relativeToGoal: Goal | null,
+  existingGoals: Goal[],
+  canvasSize: { width: number, height: number },
+  direction: string
+): Position
+```
+
+**Algorithm:**
+1. Calculate ideal position based on relationship
+2. Check for collisions using `detectCardCollision()`  
+3. If collision: find nearest safe position in expanding spiral
+4. Return guaranteed collision-free position
+
+### Functions Being Replaced
+- ❌ **redistributeChildren()** - ~50 lines of complex logic
+- ❌ **calculateChildPosition()** - ~60 lines, overlaps with redistribute
+- ❌ **addSiblingGoal() positioning logic** - ~100 lines of manual pushing
+- ❌ **standardizeGoalPositions()** - ~120 lines, different algorithm
+- ✅ **positionGoalSafely()** - ONE master function for everything
+
+### Implementation Plan
+1. **Phase 1A**: Build `positionGoalSafely()` function ⏳
+2. **Phase 1B**: Build `findSafePosition()` helper (collision avoidance)
+3. **Phase 1C**: Replace `addSubGoal()` to use new master function
+4. **Phase 1D**: Replace `addSiblingGoal()` to use new master function  
+5. **Phase 1E**: Remove obsolete functions, clean up
+
+### Expected Benefits
+- **🎯 Zero Overlaps**: Mathematically impossible with collision detection
+- **🚀 Sustainable Code**: One function to maintain instead of 4+
+- **💪 Future-Ready**: Drag-drop hierarchy changes will "just work"
+- **🧹 Clean Codebase**: Eliminate 300+ lines of redundant positioning code
+- **🐛 Bug-Free**: No more edge cases or timing issues with positioning
+
+### Success Criteria
+- ✅ No card overlaps in any scenario (1-20 children, any hierarchy depth)
+- ✅ All existing functionality preserved (adding children, siblings)
+- ✅ Drag-and-drop ready (goal A onto goal B = repositioning works)
+- ✅ Performance maintained (positioning takes <50ms)
+- ✅ Code reduction (net reduction of 200+ lines)
+
+### Files Being Modified
+- `src/utils/gridHelpers.ts` - Add master positioning functions
+- `src/components/GoalBreakdown/index.tsx` - Replace positioning calls
+- `docs/DEVELOPMENT_LOG.md` - Document the transformation
+
+### Testing Strategy
+1. **Unit Testing**: Test positionGoalSafely with various scenarios
+2. **Integration Testing**: Add 10+ children to one parent, verify no overlaps
+3. **Stress Testing**: Complex 4-level hierarchy with 20+ goals
+4. **Performance Testing**: Measure positioning speed with large hierarchies
+
+### Final Results
+**Status:** ❌ **FAILED** - Collision detection approach unsuccessful
+
+**What We Built:**
+1. ✅ Collision detection functions (`detectCardCollision`, `doRectanglesOverlap`)
+2. ✅ Master positioning function (`positionGoalSafely`)
+3. ✅ Column-based search instead of spiral search
+4. ✅ Fixed JavaScript falsy bug with `excludeGoalId`
+5. ✅ Added extra spacing buffer
+6. ✅ Replaced old `standardizeGoalPositions` calls
+
+**What Failed:**
+- Overlaps still occur from 4th child onward
+- View switching still causes overlaps
+- Column-based positioning produces scattered layout instead of organized columns
+
+**Root Cause Analysis:**
+The collision detection logic may be sound, but deeper issues exist:
+1. **React State Timing**: Collision detection may run against stale goal data due to async state updates
+2. **Multiple Systems Fighting**: Old positioning logic may still be running and overriding new positions  
+3. **Wrong Approach**: Trying to solve layout problems with collision detection instead of fixing layout algorithm directly
+
+**Key Learning:**
+Collision detection is a band-aid solution. The real problem is that the layout algorithms themselves need fundamental rework, not collision avoidance on top of broken positioning logic.
+
+---

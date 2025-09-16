@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Check, X, Target, Edit3, Move, Eye, EyeOff, Focus, Menu } from 'lucide-react';
 import { ConnectionLines } from '../ConnectionLines';
 import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition, standardizeGoalPositions } from '../../utils/gridHelpers';
@@ -8,6 +8,7 @@ import GoalCardMenu from '../GoalCardMenu';
 import GoalCard from '../GoalCard';
 import ImportExport from '../ImportExport';
 import ListView from '../ListView';
+import AppNavigation from '../AppNavigation';
 
 // Types for celebration system
 type CelebrationType = 'humble' | 'nice' | 'awesome' | 'epic';
@@ -301,6 +302,21 @@ const GoalBreaker = () => {
     setExportMessage(message);
     // Clear message after 2 seconds
     setTimeout(() => setExportMessage(''), 2000);
+  };
+
+  // Handle view changes from navigation
+  const handleViewChange = (view: string) => {
+    // When switching to canvas view, standardize all goal positions
+    if (view === 'canvas' && currentView !== 'canvas' && goals.length > 0) {
+      const standardizedGoals = standardizeGoalPositions(goals, canvasSize.width, canvasSize.height, currentDirection);
+      setGoals(standardizedGoals);
+      
+      // Force connections to update after switching to canvas
+      setTimeout(() => {
+        setGoals(current => [...current]); // Trigger re-render for connections
+      }, 10);
+    }
+    setCurrentView(view);
   };
 
   // Redistribute all children intelligently around their parent (like Mermaid Live)
@@ -690,13 +706,34 @@ const GoalBreaker = () => {
   };
 
   const handleCanvasKeyDown = (e) => {
+    // Don't process shortcuts if user is editing text
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+      return;
+    }
+
     if (e.code === 'Space') {
-      // Don't prevent spacebar if user is editing text
-      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
-        return;
-      }
       setSpacePressed(true);
       e.preventDefault();
+    }
+    
+    // Keyboard shortcuts when a card is selected
+    if (selectedGoal) {
+      const selectedGoalData = goals.find(g => g.id === selectedGoal);
+      const isUltimateGoal = selectedGoalData?.level === 0;
+      
+      if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+        // ENTER: Add sibling (both main keyboard and numpad)
+        // Only allow siblings for non-ultimate goals
+        if (!isUltimateGoal) {
+          const siblingDirection = currentDirection === 'up-down' ? 'right' : 'below';
+          addSiblingGoal(selectedGoal, siblingDirection);
+        }
+        e.preventDefault();
+      } else if (e.code === 'Tab') {
+        // TAB: Add child
+        addSubGoal(selectedGoal);
+        e.preventDefault();
+      }
     }
   };
 
@@ -741,201 +778,21 @@ const GoalBreaker = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 overflow-hidden">
-      {/* ===== HEADER SECTION ===== */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-        <div className="flex justify-between items-center px-6 py-4">
-          {/* Left side: Logo and Menu button */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <Target className="text-yellow-600" size={24} />
-              <h1 className="text-xl font-bold text-gray-800">Goal Breaker</h1>
-              {focusedGoal && (
-                <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Focus Mode Active
-                </div>
-              )}
-            </div>
-            
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
-            >
-              <Menu size={20} />
-              <span>Menu</span>
-            </button>
-          </div>
-
-          {/* Right side: Controls and placeholders */}
-          <div className="flex items-center gap-4">
-            {/* Direction Toggle */}
-            <div className="flex items-center bg-white rounded-lg p-1 shadow-lg border border-gray-200">
-              <button
-                onClick={() => setCurrentDirection('right-left')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1 group relative ${
-                  currentDirection === 'right-left' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                ⬅️
-                {/* Tooltip below */}
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Right to Left
-                  <div className="text-[10px] text-gray-300">Goal on right</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setCurrentDirection('left-right')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1 group relative ${
-                  currentDirection === 'left-right' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                ➡️
-                {/* Tooltip below */}
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Left to Right
-                  <div className="text-[10px] text-gray-300">Goal on left</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setCurrentDirection('up-down')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-1 group relative ${
-                  currentDirection === 'up-down' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                ⬇️
-                {/* Tooltip below */}
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Up to Down
-                  <div className="text-[10px] text-gray-300">Goal on top</div>
-                </div>
-              </button>
-            </div>
-            
-            {/* View Toggle */}
-            <div className="flex items-center bg-white rounded-lg p-1 shadow-lg border border-gray-200">
-              <button
-                onClick={() => {
-                  // When switching to canvas view, standardize all goal positions
-                  if (currentView !== 'canvas' && goals.length > 0) {
-                    const standardizedGoals = standardizeGoalPositions(goals, canvasSize.width, canvasSize.height, currentDirection);
-                    setGoals(standardizedGoals);
-                    
-                    // Force connections to update after switching to canvas
-                    setTimeout(() => {
-                      setGoals(current => [...current]); // Trigger re-render for connections
-                    }, 10);
-                  }
-                  setCurrentView('canvas');
-                }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  currentView === 'canvas' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                Canvas
-              </button>
-              <button
-                onClick={() => setCurrentView('list')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  currentView === 'list' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                List
-              </button>
-            </div>
-
-            {/* Share placeholder */}
-            <button className="px-4 py-2 rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed transition-colors">
-              🔗 share
-            </button>
-
-            {/* Sign in to save placeholder */}
-            <button className="px-4 py-2 rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed transition-colors">
-              👤 save
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== OVERLAY COMPONENTS ===== */}
-      <React.Fragment>
-        {/* Hamburger Menu Overlay */}
-        {isMenuOpen && (
-          <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}>
-            <div className="absolute top-20 left-6 w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
-                 onClick={(e) => e.stopPropagation()}>
-              {/* Menu Header */}
-              <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-gray-800">Goal Breaker</h3>
-                <button
-                  onClick={() => setIsMenuOpen(false)}
-                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              
-              {/* Menu Items */}
-              <div className="p-4 space-y-4">
-                {/* Stats */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <span className="text-lg">📊</span>
-                    <span className="font-medium">Stats</span>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-1">
-                      {goals.filter(g => g.completed).length} / {goals.length} completed
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-green-500 h-2 rounded-full transition-all duration-300" 
-                        style={{ 
-                          width: goals.length > 0 
-                            ? `${(goals.filter(g => g.completed).length / goals.length) * 100}%` 
-                            : '0%' 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Import/Export Component */}
-                <ImportExport 
-                  goals={goals}
-                  onGoalsImported={handleGoalsImported}
-                  onExportMessage={handleExportMessage}
-                />
-                
-                {/* Divider */}
-                <div className="border-t border-gray-200 my-4"></div>
-                
-                {/* Reset */}
-                <button
-                  onClick={() => {
-                    reset();
-                    setIsMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 p-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  <span className="text-lg">🔄</span>
-                  <span>Reset All Goals</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-
-      </React.Fragment>
+      {/* ===== NAVIGATION ===== */}
+      <AppNavigation
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        currentDirection={currentDirection}
+        setCurrentDirection={setCurrentDirection}
+        focusedGoal={focusedGoal}
+        isMenuOpen={isMenuOpen}
+        setIsMenuOpen={setIsMenuOpen}
+        goals={goals}
+        onReset={reset}
+        onGoalsImported={handleGoalsImported}
+        onExportMessage={handleExportMessage}
+        onViewChange={handleViewChange}
+      />
 
       {/* ===== MAIN CONTENT AREA ===== */}
       {currentView === 'list' ? (
@@ -1020,20 +877,35 @@ const GoalBreaker = () => {
 
       {/* ===== FLOATING UI ELEMENTS ===== */}
       <React.Fragment>
-        {/* Floating Helper Text - appears when editing goals, showing export messages, or navigation help */}
-        {(goals.some(goal => goal.isEditing) || exportMessage || spacePressed || isPanning) && (
+        {/* Floating Helper Text - appears when editing goals, showing export messages, navigation help, or keyboard shortcuts */}
+        {(goals.some(goal => goal.isEditing) || exportMessage || spacePressed || isPanning || selectedGoal) && (
           <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
             <div className="bg-white/95 backdrop-blur-sm border border-gray-300 shadow-lg rounded-lg px-4 py-2 text-sm text-gray-700 flex items-center gap-2">
               {goals.some(goal => goal.isEditing) ? (
                 <>
-                  <span className="text-lg">💡</span>
-                  <span>Press <strong>Enter</strong> to save, <strong>Esc</strong> to cancel</span>
+                  <span className="text-lg">⌨️</span>
+                  <span>Press <kbd className="kbd">Enter</kbd> to save, <kbd className="kbd">Esc</kbd> to cancel</span>
                 </>
               ) : (spacePressed || isPanning) ? (
                 <>
-                  <span className="text-lg">🖱️</span>
                   <span>
-                    Hold <strong>Spacebar</strong> or <strong>Middle mouse button</strong> + drag to pan
+                    ⌨️ Hold <kbd className="kbd">Spacebar</kbd> or 🖱️ <kbd className="kbd">Middle mouse button</kbd> + drag to pan
+                  </span>
+                </>
+              ) : selectedGoal ? (
+                <>
+                  <span className="text-lg">⌨️</span>
+                  <span>
+                    {(() => {
+                      const selectedGoalData = goals.find(g => g.id === selectedGoal);
+                      const isUltimateGoal = selectedGoalData?.level === 0;
+                      
+                      if (isUltimateGoal) {
+                        return <><kbd className="kbd">Tab</kbd> = new child</>;
+                      } else {
+                        return <><kbd className="kbd">Enter</kbd> = new sibling, <kbd className="kbd">Tab</kbd> = new child</>;
+                      }
+                    })()}
                   </span>
                 </>
               ) : (

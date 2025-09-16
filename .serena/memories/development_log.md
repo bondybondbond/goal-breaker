@@ -1,34 +1,54 @@
 # Development Log - Goal Breaker
 
-## Recent Session Changes
+## Recent Session (Sept 16, 2025)
 
-### 2025-01-25: Card Selection Visual Fixes
+### Bugs Fixed:
+1. **Middle-mouse click bug** - Fixed in `GoalCard.tsx`
+   - Problem: Middle-click on goal cards moved the card instead of panning canvas
+   - Solution: Added check for `e.button !== 0` to only handle left-clicks for dragging
+   - File: `src/components/GoalCard.tsx` - modified `handleMouseDown` function
 
-#### Issue 1: Selection Effects ✅ FIXED
-Removed unwanted visual scaling, borders, shadows, and pulse animations during card selection.
+2. **Direction toggle color improvement** - Fixed in `index.tsx`
+   - Problem: Blue buttons had poor contrast with blue arrow emojis
+   - Solution: Changed to mint green (emerald) color scheme for fresh, modern look
+   - Added: "Direction" label with separator line for clarity
+   - File: `src/components/GoalBreakdown/index.tsx` - modified direction toggle section
+   - Final color choice: **Mint green** - selected after testing peach, grey, and mint options
+   - Active state: `bg-emerald-100 text-emerald-900 shadow-sm border border-emerald-200`
+   - Hover state: `hover:text-emerald-800 hover:bg-emerald-50`
 
-#### Issue 2: Text Alignment Consistency ❌ REVERTED
-**Problem**: Text alignment inconsistent between editing/display modes.
-**Decision**: Reverted to functional state - display text center-aligned, editing text top-aligned with scroll bars for proper UX.
+### Major Refactoring:
+3. **AppNavigation.tsx extraction** - MAJOR CODE CLEANUP
+   - Problem: Main file was 1,101 lines (3-10x too big for React component)
+   - Solution: Extracted all navigation/header components into separate file
+   - Files: 
+     - Created: `src/components/AppNavigation.tsx` (174 lines)
+     - Modified: `src/components/GoalBreakdown/index.tsx` (933 lines, down from 1,101)
+   - **Result**: 15% reduction in main file size, much cleaner architecture
+   - **Components extracted**: Header, direction controls, view toggles, menu overlay, action buttons
+   - **Clean separation**: Navigation UI vs Core app logic
+   - **Future-proof**: Components can be repositioned independently as app evolves
 
-#### Issue 3: Selection Visibility ✅ FIXED
-**Problem**: No clear visual indication of selected card (only plus buttons showed selection).
+### Technical Notes:
+- Mouse button codes: 0 = left, 1 = middle, 2 = right
+- Mint green provides excellent contrast with blue arrow emojis (⬅️➡️⬇️)
+- Added `handleViewChange` function to manage canvas view switching logic
+- AppNavigation receives props for all state it needs, maintaining clean separation
+- Main component now much more focused on core goal management logic
 
-**Solution**: Added subtle selection indicator:
-- **Selected cards**: Thin colored border (2px) matching level color
-- **Non-selected cards**: Standard gray border
-- **Color coding**: Yellow for main goals, blue for level 1, purple for level 2, etc.
+### Architecture Improvements:
+- Single responsibility principle: Navigation components separated from core logic
+- Better maintainability: Navigation changes won't affect core app logic
+- Cleaner file structure: 933 lines is much more manageable than 1,101
+- Improved readability: Main component focuses on business logic, not UI
 
-**Implementation**: Modified border styling in GoalCard component:
-- `isSelected ? 'border-2 ${selectionColor.bg.replace('bg-', 'border-')}' : 'border border-gray-200'`
+### Next Priority Bugs:
+- Overlaps issue (high priority)
+- Panning distortion with spacebar
+- Celebration zoom/spin levels
+- Text editing surface area mismatch
 
-**Files Modified**:
-- `src/components/GoalBreakdown/index.tsx` - GoalCard border styling
-
-#### Current Status:
-- ✅ Selection effects cleaned up
-- ✅ Selection visibility restored with subtle indicator
-- ✅ Text editing functionality preserved
-- ⏳ Ready for user testing of selection indicator
-
-**Next**: Test selection visibility across different level cards.
+### Future Refactoring Opportunities:
+- ConnectionManager.tsx (connection calculation logic)
+- Canvas event handlers (130 lines of complex logic)
+- Goal management functions (could be custom hook)

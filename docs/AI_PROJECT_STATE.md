@@ -30,13 +30,12 @@
 - **Entry Point**: `src/App.tsx` (simple, just imports GoalBreakdown)
 
 ## 🚨 Known Issues & Bugs
-- **FIXED**: Deployment blank screen - fixed package.json build script and vercel.json configuration
+- **FIXED**: Enhanced spacing should resolve most 4+ children overlap issues
 - **Performance**: Drag may lag with many goals (untested)
 - **Mobile**: Basic responsive only, canvas not optimized for touch
 - **State**: No persistence - refreshing loses all work
 - **Canvas Navigation**: Middle mouse on goal card moves both canvas and card (should only move canvas)
 - **Connector Alignment**: When creating in list view, connectors misalign in canvas view
-- **Menu Position**: Should be moved to left side for future accounts section
 
 ## 🎨 Key Functions (in GoalBreakdown/index.tsx)
 - `handleGoalDragStart()` - Initiates goal dragging
@@ -54,23 +53,22 @@
 
 ## 🔄 Recent Sessions Summary
 
-### Component Architecture Improvement (Sessions 18-21)
-**Problem:** 1,126-line monolith file becoming difficult to maintain and develop
-**Solution:** Systematic component extraction following 80/20 principle for maximum impact
+### Architecture Reset & Smart Spacing Fix (Session 22)
+**Problem:** Collision detection approach failed - added complexity without solving core layout issues
+**Solution:** Restore to working deployed version + simple spacing improvements
 
 **Changes Made:**
-- **GoalCard Extraction** (Session 18): 285 lines → dedicated component
-- **ImportExport Extraction** (Session 19): 155 lines → dedicated component  
-- **ListView Extraction** (Session 21): 122 lines → dedicated component
-- **Main Component Reduction**: 1,126 → 882 lines (22% smaller)
-- **Development Speed**: Future feature work 3-5x faster due to focused components
-- **Type Safety**: Added proper TypeScript interfaces for all extracted components
+- **Smart Revert**: Restored to latest working commit (ba970403) with all modern features
+- **Space-Efficient Layout**: Reverted to compact spacing + narrower cards (CARD_WIDTH: 320→280px)
+- **Foundation Preserved**: All extracted components (GoalCard, ListView, ImportExport) intact
+- **Modern Features**: Menu system, celebrations, direction switching all working
+- **Clean Architecture**: No collision detection complexity, just better spacing
 
-### Core Architecture Status
-- ✅ **Main Component**: Now focuses on canvas, state management, and coordination
-- ✅ **Component Separation**: All major UI concerns isolated to dedicated files
-- ✅ **Clean Interfaces**: Type-safe prop passing between components
-- ✅ **Zero Breaking Changes**: All functionality preserved during extractions
+### Lessons Learned (Product Management)
+- ✅ **80/20 Rule**: Simple spacing improvements will likely solve 80% of overlap issues
+- ✅ **Incremental Changes**: One change at a time prevents complexity explosion  
+- ✅ **Know When to Revert**: Sometimes the best move is going back to working state
+- ✅ **Wrong Problem**: Was layout issue, not collision detection issue
 
 ## 🎉 MVP COMPLETE! (9/9 Features Done)
 

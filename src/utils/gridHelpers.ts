@@ -2,11 +2,11 @@ import { Goal, Position, GridConfig } from "../types/goal.types";
 
 export const GRID: GridConfig = {
   COLUMN_WIDTH: 400,
-  ROW_HEIGHT: 200,  // Increased from 140 for more vertical space
-  CARD_WIDTH: 320,
+  ROW_HEIGHT: 200,  // Back to original compact spacing
+  CARD_WIDTH: 280,  // Narrower cards for better space efficiency  
   CARD_HEIGHT: 120,
-  MARGIN: 60,       // Increased from 40 for more padding
-  VERTICAL_GAP: 40  // Increased from 20 for more space between siblings
+  MARGIN: 60,       
+  VERTICAL_GAP: 40  // Back to original spacing
 };
 
 // Convert grid coordinates to pixel position

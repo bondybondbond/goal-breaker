@@ -7,6 +7,8 @@ interface AppNavigationProps {
   setCurrentView: (view: string) => void;
   currentDirection: string;
   setCurrentDirection: (direction: string) => void;
+  connectorStyle: string;
+  setConnectorStyle: (style: string) => void;
   focusedGoal: number | null;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
@@ -22,6 +24,8 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
   setCurrentView,
   currentDirection,
   setCurrentDirection,
+  connectorStyle,
+  setConnectorStyle,
   focusedGoal,
   isMenuOpen,
   setIsMenuOpen,
@@ -190,6 +194,38 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
                 </div>
               </div>
               
+              {/* Connector Style */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <span className="text-lg">🔗</span>
+                  <span className="font-medium">Connector Style</span>
+                </div>
+                <div className="flex items-center bg-gray-50 rounded-lg p-1">
+                  <button
+                    onClick={() => setConnectorStyle('straight')}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      connectorStyle === 'straight' 
+                        ? 'text-gray-800 shadow-sm border border-orange-300' 
+                        : 'text-gray-600 hover:text-orange-600 hover:bg-white'
+                    }`}
+                    style={connectorStyle === 'straight' ? { backgroundColor: '#FFD9AF' } : {}}
+                  >
+                    ↘️ Straight
+                  </button>
+                  <button
+                    onClick={() => setConnectorStyle('curved')}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      connectorStyle === 'curved' 
+                        ? 'text-gray-800 shadow-sm border border-orange-300' 
+                        : 'text-gray-600 hover:text-orange-600 hover:bg-white'
+                    }`}
+                    style={connectorStyle === 'curved' ? { backgroundColor: '#FFD9AF' } : {}}
+                  >
+                    ⤵️ Curved
+                  </button>
+                </div>
+              </div>
+
               {/* Import/Export Component */}
               <ImportExport 
                 goals={goals}

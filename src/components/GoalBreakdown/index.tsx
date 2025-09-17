@@ -19,8 +19,10 @@ const GoalBreaker = () => {
   const [isStarted, setIsStarted] = useState(false);
   const [currentView, setCurrentView] = useState('canvas'); // 'canvas' or 'list'
   const [currentDirection, setCurrentDirection] = useState('right-left'); // 'right-left', 'left-right', 'up-down'
+  const [connectorStyle, setConnectorStyle] = useState('straight'); // 'curved' or 'straight'
   const [draggedGoal, setDraggedGoal] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragPreviewPosition, setDragPreviewPosition] = useState(null); // For smooth dragging without state updates
   const [connections, setConnections] = useState([]);
   const [hiddenLevels, setHiddenLevels] = useState(new Set());
   const [focusedGoal, setFocusedGoal] = useState(null);
@@ -89,29 +91,39 @@ const GoalBreaker = () => {
             if (currentDirection === 'up-down') {
               // Top-down: connect from bottom of parent to top of child
               fromX = parent.position.x + GRID.CARD_WIDTH / 2; // Center of parent card
-              fromY = parent.position.y + GRID.CARD_HEIGHT;    // Bottom edge of parent
+              fromY = parent.position.y + GRID.CARD_HEIGHT + 5;    // Slightly below parent
               toX = goal.position.x + GRID.CARD_WIDTH / 2;     // Center of child card
-              toY = goal.position.y;                           // Top edge of child
+              toY = goal.position.y - 5;                           // Slightly above child (for arrow integration)
               
-              // Create vertical line with slight curve
-              midY = fromY + (toY - fromY) / 2;
-              curveOffset = 20; // Small fixed curve for visual appeal
-              path = `M ${fromX} ${fromY} Q ${fromX - curveOffset} ${midY} ${toX} ${toY}`;
+              // Create PowerPoint-style cubic bezier curves (TOP-DOWN)
+              const distance = Math.sqrt((toX - fromX) ** 2 + (toY - fromY) ** 2);
+              const curveIntensity = Math.min(60, distance * 0.3);
+              // TOP-DOWN: Curve outward horizontally
+              const control1X = fromX;
+              const control1Y = fromY + curveIntensity;
+              const control2X = toX;
+              const control2Y = toY - curveIntensity;
+              path = `M ${fromX} ${fromY} C ${control1X} ${control1Y} ${control2X} ${control2Y} ${toX} ${toY}`;
             } else {
               // Horizontal layouts (left-right and right-left)
               fromX = currentDirection === 'left-right' 
-                ? parent.position.x + GRID.CARD_WIDTH  // Right edge of parent card
-                : parent.position.x;                   // Left edge of parent card
+                ? parent.position.x + GRID.CARD_WIDTH + 5  // Slightly right of parent
+                : parent.position.x - 5;                   // Slightly left of parent card
               fromY = parent.position.y + GRID.CARD_HEIGHT / 2; // Middle height of parent
               toX = currentDirection === 'left-right'
-                ? goal.position.x                      // Left edge of child card  
-                : goal.position.x + GRID.CARD_WIDTH;   // Right edge of child card
+                ? goal.position.x - 5                      // Slightly left of child (for arrow integration)
+                : goal.position.x + GRID.CARD_WIDTH + 5;   // Slightly right of child card
               toY = goal.position.y + GRID.CARD_HEIGHT / 2; // Middle height of child
               
-              // Create straight horizontal line with slight curve
-              midX = fromX + (toX - fromX) / 2;
-              curveOffset = 20; // Small fixed curve for visual appeal
-              path = `M ${fromX} ${fromY} Q ${midX} ${fromY - curveOffset} ${toX} ${toY}`;
+              // Create PowerPoint-style cubic bezier curves (HORIZONTAL)
+              const distance = Math.sqrt((toX - fromX) ** 2 + (toY - fromY) ** 2);
+              const curveIntensity = Math.min(60, distance * 0.3);
+              // HORIZONTAL: Curve outward vertically
+              const control1X = fromX + (currentDirection === 'left-right' ? curveIntensity : -curveIntensity);
+              const control1Y = fromY;
+              const control2X = toX + (currentDirection === 'left-right' ? -curveIntensity : curveIntensity);
+              const control2Y = toY;
+              path = `M ${fromX} ${fromY} C ${control1X} ${control1Y} ${control2X} ${control2Y} ${toX} ${toY}`;
             }
             
             newConnections.push({
@@ -612,14 +624,26 @@ const GoalBreaker = () => {
     const newId = Math.max(0, ...goals.map(g => g.id), 0) + 1;
     const newRow = getNextRowForLevel(0, goals);
     
-    // Position ultimate goal on the right side of canvas
+    // Position ultimate goal based on current direction (top center, left center, or right center)
     const newPosition = position || (goals.length === 0 
-      ? { 
-          x: currentDirection === 'left-right' 
-            ? GRID.MARGIN 
-            : canvasSize.width - GRID.MARGIN - GRID.CARD_WIDTH, // Direction-aware positioning
-          y: (canvasSize.height - GRID.CARD_HEIGHT) / 2 
-        }
+      ? (() => {
+          if (currentDirection === 'up-down') {
+            return {
+              x: (canvasSize.width - GRID.CARD_WIDTH) / 2, // Top center
+              y: GRID.MARGIN
+            };
+          } else if (currentDirection === 'left-right') {
+            return {
+              x: GRID.MARGIN, // Left side
+              y: (canvasSize.height - GRID.CARD_HEIGHT) / 2
+            };
+          } else {
+            return {
+              x: canvasSize.width - GRID.MARGIN - GRID.CARD_WIDTH, // Right side
+              y: (canvasSize.height - GRID.CARD_HEIGHT) / 2
+            };
+          }
+        })()
       : gridToPosition(0, newRow, canvasSize.width, currentDirection));
 
     const newGoal = {
@@ -686,23 +710,32 @@ const GoalBreaker = () => {
       }
     }
     
-    // Handle goal dragging
+    // Handle goal dragging - using preview position for smooth performance
     if (draggedGoal) {
       const canvasRect = canvasRef.current.getBoundingClientRect();
       const mouseX = e.clientX - canvasRect.left - canvasOffset.x - dragOffset.x;
       const mouseY = e.clientY - canvasRect.top - canvasOffset.y - dragOffset.y;
 
-      setGoals(goals.map(goal => 
-        goal.id === draggedGoal.id 
-          ? { ...goal, position: { x: mouseX, y: mouseY } }
-          : goal
-      ));
+      // Update preview position immediately (no state update, no re-render)
+      setDragPreviewPosition({ x: mouseX, y: mouseY });
     }
   };
 
   const handleCanvasMouseUp = () => {
     setIsPanning(false);
+    
+    // Apply final drag position when drag ends
+    if (draggedGoal && dragPreviewPosition) {
+      setGoals(goals.map(goal => 
+        goal.id === draggedGoal.id 
+          ? { ...goal, position: dragPreviewPosition }
+          : goal
+      ));
+    }
+    
+    // Clean up drag state
     setDraggedGoal(null);
+    setDragPreviewPosition(null);
   };
 
   const handleCanvasKeyDown = (e) => {
@@ -784,6 +817,8 @@ const GoalBreaker = () => {
         setCurrentView={setCurrentView}
         currentDirection={currentDirection}
         setCurrentDirection={setCurrentDirection}
+        connectorStyle={connectorStyle}
+        setConnectorStyle={setConnectorStyle}
         focusedGoal={focusedGoal}
         isMenuOpen={isMenuOpen}
         setIsMenuOpen={setIsMenuOpen}
@@ -832,7 +867,7 @@ const GoalBreaker = () => {
             }}
           >
             {/* Connection Lines */}
-            <ConnectionLines connections={connections} canvasSize={canvasSize} />
+            <ConnectionLines connections={connections} canvasSize={canvasSize} connectorStyle={connectorStyle} direction={currentDirection} />
             
             {/* Goals */}
             {goals.length === 0 ? (
@@ -851,25 +886,41 @@ const GoalBreaker = () => {
                 </div>
               </div>
             ) : (
-              getVisibleGoals().map(goal => (
-                <GoalCard
-                  key={goal.id}
-                  goal={goal}
-                  currentDirection={currentDirection}
-                  onUpdate={updateGoal}
-                  onToggleComplete={toggleComplete}
-                  onAddSubGoal={addSubGoal}
-                  onAddSiblingGoal={addSiblingGoal}
-                  onDelete={deleteGoal}
-                  onStartEditing={startEditing}
-                  onToggleFocus={toggleFocus}
-                  isFocused={focusedGoal === goal.id}
-                  isDragged={draggedGoal?.id === goal.id}
-                  onDragStart={handleGoalDragStart}
-                  isSelected={selectedGoal === goal.id}
-                  onSelect={setSelectedGoal}
-                />
-              ))
+              getVisibleGoals().map(goal => {
+                // Calculate transform for smooth dragging
+                const isDraggedCard = draggedGoal?.id === goal.id;
+                const dragTransform = (isDraggedCard && dragPreviewPosition) 
+                  ? `translate(${dragPreviewPosition.x - goal.position.x}px, ${dragPreviewPosition.y - goal.position.y}px)`
+                  : '';
+                
+                return (
+                  <div
+                    key={`wrapper-${goal.id}`}
+                    style={{
+                      transform: dragTransform,
+                      transition: isDraggedCard ? 'none' : 'transform 0.2s ease',
+                    }}
+                  >
+                    <GoalCard
+                      key={goal.id}
+                      goal={goal}
+                      currentDirection={currentDirection}
+                      onUpdate={updateGoal}
+                      onToggleComplete={toggleComplete}
+                      onAddSubGoal={addSubGoal}
+                      onAddSiblingGoal={addSiblingGoal}
+                      onDelete={deleteGoal}
+                      onStartEditing={startEditing}
+                      onToggleFocus={toggleFocus}
+                      isFocused={focusedGoal === goal.id}
+                      isDragged={isDraggedCard}
+                      onDragStart={handleGoalDragStart}
+                      isSelected={selectedGoal === goal.id}
+                      onSelect={setSelectedGoal}
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

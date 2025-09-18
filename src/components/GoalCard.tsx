@@ -118,7 +118,10 @@ const GoalCard: React.FC<GoalCardProps> = ({
         width: GRID.CARD_WIDTH,
         height: GRID.CARD_HEIGHT,
         zIndex: isDragged ? 50 : isSelected ? 40 : isFocused ? 30 : 10,
-        userSelect: 'none'
+        userSelect: 'none',
+        // Hardware-accelerated transforms for smooth dragging
+        transform: isDragged ? 'translate3d(0,0,0)' : 'none',
+        willChange: isDragged ? 'transform' : 'auto'
       }}
       onMouseDown={handleMouseDown}
     >

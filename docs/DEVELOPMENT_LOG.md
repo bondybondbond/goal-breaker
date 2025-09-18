@@ -95,6 +95,62 @@ Likely occurred during previous edit operations where a duplicate `const` keywor
 
 ---
 
+## Session 23: September 17, 2025 - Default Connector Style Change (UX Improvement)
+**Duration:** ~10 minutes  
+**Status:** ✅ Completed
+
+### Goals Achieved
+- **Improved Default UX**: Changed default connector style from 'curved' to 'straight' based on user preference
+- **Better Menu Order**: Positioned 'Straight' as first option (left side) in connector style menu
+- **User Expectation Alignment**: Most users prefer cleaner straight lines as default
+
+### Changes Made
+1. **Updated Default Connector Style**
+   - Changed initial state in `GoalBreakdown/index.tsx`: `useState('curved')` → `useState('straight')`
+   - New users now see straight connectors by default instead of curved
+
+2. **Reordered Menu Buttons**
+   - Swapped button positions in `AppNavigation.tsx`
+   - **Before**: [Curved][Straight] 
+   - **After**: [Straight][Curved]
+   - Straight option now appears first (left side) as primary choice
+
+### Files Modified
+- `src/components/GoalBreakdown/index.tsx` (default state change)
+- `src/components/AppNavigation.tsx` (button order swap)
+
+### User Experience Improvements
+- **Better First Impression**: New users see cleaner straight lines immediately
+- **Logical Menu Order**: Primary/preferred option (Straight) appears first
+- **Maintains Choice**: Users can still easily switch to curved if preferred
+- **Consistent with Feedback**: Follows user preference data showing straight lines preferred
+
+### Testing Status
+- ✅ Default connector style updated successfully
+- ✅ Menu button order changed correctly  
+- ✅ All functionality preserved - switching still works
+- ✅ Deployed to production via automatic Vercel deployment
+
+### Git Commit Details
+- **Commit ID**: `1462b48d`
+- **Message**: "Set straight connectors as default and reorder menu buttons"
+- **Files**: 2 files changed, 134 insertions(+), 47 deletions(-)
+- **Status**: Successfully pushed and deployed
+
+### Development Process Notes
+**Followed best practices:**
+- Made focused single change (one feature at a time)
+- Tested compilation before commit
+- Used descriptive commit message
+- Automatic deployment worked correctly
+
+### Next Session Priorities
+1. **User Testing** - Get feedback on new default from real usage
+2. **Continue with Major Bugs** - Tackle overlapping cards issue (highest priority)
+3. **Add Missing Core Features** - Save functionality, confetti celebrations
+
+---
+
 ## Session Template (For Future Use)
 **Date:** [DATE] - [TITLE]  
 **Duration:** [TIME]  

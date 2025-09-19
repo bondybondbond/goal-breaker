@@ -9,6 +9,8 @@ interface AppNavigationProps {
   setCurrentDirection: (direction: string) => void;
   connectorStyle: string;
   setConnectorStyle: (style: string) => void;
+  cardSorting: string;
+  setCardSorting: (sorting: string) => void;
   focusedGoal: number | null;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
@@ -26,6 +28,8 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
   setCurrentDirection,
   connectorStyle,
   setConnectorStyle,
+  cardSorting,
+  setCardSorting,
   focusedGoal,
   isMenuOpen,
   setIsMenuOpen,
@@ -222,6 +226,38 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
                     style={connectorStyle === 'curved' ? { backgroundColor: '#FFD9AF' } : {}}
                   >
                     ⤵️ Curved
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Sorting */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <span className="text-lg">🎯</span>
+                  <span className="font-medium">Card Sorting</span>
+                </div>
+                <div className="flex items-center bg-gray-50 rounded-lg p-1">
+                  <button
+                    onClick={() => setCardSorting('off')}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      cardSorting === 'off' 
+                        ? 'text-gray-800 shadow-sm border border-orange-300' 
+                        : 'text-gray-600 hover:text-orange-600 hover:bg-white'
+                    }`}
+                    style={cardSorting === 'off' ? { backgroundColor: '#FFD9AF' } : {}}
+                  >
+                    ➖ Off
+                  </button>
+                  <button
+                    onClick={() => setCardSorting('priority')}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      cardSorting === 'priority' 
+                        ? 'text-gray-800 shadow-sm border border-orange-300' 
+                        : 'text-gray-600 hover:text-orange-600 hover:bg-white'
+                    }`}
+                    style={cardSorting === 'priority' ? { backgroundColor: '#FFD9AF' } : {}}
+                  >
+                    🎯 By Priority
                   </button>
                 </div>
               </div>

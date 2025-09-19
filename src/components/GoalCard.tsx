@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { getLevelStyle } from '../utils/styleHelpers';
 import { GRID } from '../utils/gridHelpers';
 import GoalCardMenu from './GoalCardMenu';
@@ -14,6 +14,7 @@ interface GoalCardProps {
   onDelete: (id: number) => void;
   onStartEditing: (id: number) => void;
   onToggleFocus: (goalId: number) => void;
+  onSetPriority: (goalId: number, priority: 'high' | 'medium' | 'low') => void;
   isFocused: boolean;
   isDragged: boolean;
   onDragStart: (goal: any, event: React.MouseEvent) => void;
@@ -31,12 +32,14 @@ const GoalCard: React.FC<GoalCardProps> = ({
   onDelete,
   onStartEditing,
   onToggleFocus,
+  onSetPriority,
   isFocused,
   isDragged,
   onDragStart,
   isSelected,
   onSelect
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const levelStyle = getLevelStyle(goal.level, goal.completed);
   
   // Get the appropriate color for selection based on level
@@ -117,7 +120,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
         top: goal.position.y,
         width: GRID.CARD_WIDTH,
         height: GRID.CARD_HEIGHT,
-        zIndex: isDragged ? 50 : isSelected ? 40 : isFocused ? 30 : 10,
+        zIndex: isMenuOpen ? 9999 : isDragged ? 50 : isSelected ? 40 : isFocused ? 30 : 10,
         userSelect: 'none',
         // Hardware-accelerated transforms for smooth dragging
         transform: isDragged ? 'translate3d(0,0,0)' : 'none',
@@ -129,6 +132,21 @@ const GoalCard: React.FC<GoalCardProps> = ({
       <div 
         className={`absolute top-0 left-0 right-0 h-2 ${selectionColor.bg} rounded-t-xl`}
       />
+      
+      {/* Priority indicator - larger icon on bottom-right corner (not for ultimate goals) */}
+      {goal.priority && goal.priority !== 'medium' && goal.level > 0 && (
+        <div className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
+          goal.priority === 'high' 
+            ? 'bg-green-100 text-green-700' 
+            : 'bg-red-100 text-red-700'
+        }`}>
+          {goal.priority === 'high' ? (
+            <ArrowUp size={14} strokeWidth={2.5} />
+          ) : (
+            <ArrowDown size={14} strokeWidth={2.5} />
+          )}
+        </div>
+      )}
       
       {/* Navigation buttons - direction-aware positioning */}
       {isSelected && (
@@ -251,25 +269,29 @@ const GoalCard: React.FC<GoalCardProps> = ({
         </>
       )}
       
-      <div className="pt-2 px-4 pb-4 h-full flex flex-col relative">
+      <div className="pt-2 pl-2 pr-4 pb-1 h-full flex flex-col relative">
         {/* Three-dots menu aligned with text line */}
         <div className="absolute top-4 right-2 z-10">
           <GoalCardMenu
             onComplete={() => onToggleComplete(goal.id)}
             onRemove={() => goal.level > 0 && onDelete(goal.id)}
             onFocus={() => onToggleFocus(goal.id)}
+            onSetPriority={(priority) => onSetPriority(goal.id, priority)}
             isCompleted={goal.completed}
             isFocused={isFocused}
+            isRootGoal={goal.level === 0}
+            priority={goal.priority || 'medium'}
+            onMenuStateChange={setIsMenuOpen}
           />
         </div>
         
         {/* Text content area */}
-        <div className="flex-1 flex items-center justify-center pr-2">
+        <div className="flex-1 flex items-center justify-center pr-1">
           {goal.isEditing ? (
             <div className="relative flex-1 h-full flex items-center px-1">
               <textarea
                 defaultValue={goal.text}
-                className="w-full h-full px-2 py-1 border-0 bg-gray-100 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-300 text-xl font-bold text-gray-800"
+                className="w-full h-full px-1 py-1 border-0 bg-gray-100 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-blue-300 text-xl font-bold text-gray-800"
                 placeholder={goal.level === 0 ? "What's your main goal?" : "Describe this task..."}
                 autoFocus
                 ref={(textarea) => {
@@ -310,7 +332,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
             </div>
           ) : (
             <p 
-              className={`flex-1 text-xl cursor-text p-2 rounded-lg transition-colors font-bold text-center ${
+              className={`flex-1 text-xl cursor-text px-1 py-2 rounded-lg transition-colors font-bold text-center ${
                 goal.completed ? 'line-through text-green-700' : 'hover:bg-gray-200 text-gray-800'
               }`}
               onClick={(e) => {

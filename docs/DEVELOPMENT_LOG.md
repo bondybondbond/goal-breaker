@@ -49,6 +49,49 @@
 
 ### Testing Status
 - ✅ Canvas view renders correctly
+
+## Session 2: September 18, 2025 - Vercel Deployment Fix
+**Duration:** ~30 minutes  
+**Status:** ✅ Completed
+
+### Problems Identified
+- Vercel deployment showed dashed lines instead of solid connector lines
+- Missing arrows on connection lines in production
+- Straight/curved connector toggle not working on deployed version
+- Local version worked fine, production rendering failed
+
+### Root Cause Analysis
+- SVG marker ID conflicts between multiple component instances
+- Missing explicit stroke properties for solid line rendering
+- Production SVG rendering differences vs development
+
+### Changes Made
+1. **Fixed SVG Marker Conflicts**
+   - Generated unique marker IDs using random strings per component instance
+   - Updated marker references to use dynamic IDs
+   - Added markerUnits="strokeWidth" for consistent scaling
+
+2. **Enforced Solid Line Rendering**
+   - Added explicit strokeDasharray="none" property
+   - Enhanced stroke properties with strokeLinecap="round" and strokeLinejoin="round"
+   - Improved visual quality of connector lines
+
+3. **Fixed Syntax Errors**
+   - Resolved duplicate "export const" statements
+   - Cleaned up corrupted file content during development
+   - Complete rewrite of ConnectionLines component for clean deployment
+
+### Files Modified
+- `src/components/ConnectionLines.tsx` (complete rewrite, production fixes)
+
+### Technical Details
+- SVG marker uniqueness: Math.random().toString(36).substr(2, 9)
+- Stroke properties: Explicit solid line enforcement
+- Production compatibility: Enhanced SVG attribute specification
+
+### Testing Status
+- ✅ Local version: Solid lines and arrows working
+- ✅ Deployed version: Awaiting Vercel deployment completion (2-3 min)
 - ✅ Main goal centered on load  
 - ✅ Goals can be dragged smoothly
 - ✅ Canvas panning works

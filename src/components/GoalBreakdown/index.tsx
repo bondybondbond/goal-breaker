@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Check, X, Target, Edit3, Move, Eye, EyeOff, Focus, Menu } from 'lucide-react';
 import { ConnectionLines } from '../ConnectionLines';
-import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition, standardizeGoalPositions } from '../../utils/gridHelpers';
+import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition, standardizeGoalPositions, calculateCascadingSlots } from '../../utils/gridHelpers';
 import { getLevelStyle, getLevelStats, getLevelLabel } from '../../utils/styleHelpers';
 import ConfettiCelebration from '../ConfettiCelebration';
 import GoalCardMenu from '../GoalCardMenu';
@@ -20,6 +20,7 @@ const GoalBreaker = () => {
   const [currentView, setCurrentView] = useState('canvas'); // 'canvas' or 'list'
   const [currentDirection, setCurrentDirection] = useState('right-left'); // 'right-left', 'left-right', 'up-down'
   const [connectorStyle, setConnectorStyle] = useState('straight'); // 'curved' or 'straight'
+  const [cardSorting, setCardSorting] = useState('priority'); // 'off' or 'priority'
   const [draggedGoal, setDraggedGoal] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragPreviewPosition, setDragPreviewPosition] = useState(null); // For smooth dragging without state updates
@@ -185,10 +186,11 @@ const GoalBreaker = () => {
     setConnections(newConnections);
   }, [goals, hiddenLevels, focusedGoal, GRID.CARD_WIDTH, GRID.CARD_HEIGHT, currentDirection]);
 
-  // Re-position all goals when direction changes
+  // Re-position all goals when direction or sorting changes
   useEffect(() => {
     if (goals.length > 0) {
-      const standardizedGoals = standardizeGoalPositions(goals, canvasSize.width, canvasSize.height, currentDirection);
+      const sortedGoals = getSortedGoals(goals);
+      const standardizedGoals = calculateCascadingSlots(sortedGoals, canvasSize.width, canvasSize.height, currentDirection);
       setGoals(standardizedGoals);
       
       // Force connections to update after a short delay to ensure goal positions are applied
@@ -196,7 +198,9 @@ const GoalBreaker = () => {
         setGoals(current => [...current]); // Trigger re-render to update connections
       }, 10);
     }
-  }, [currentDirection, canvasSize.width, canvasSize.height]);
+  }, [currentDirection, canvasSize.width, canvasSize.height, cardSorting]);
+
+
 
   // Calculate existing levels from goals array
   const existingLevels = [...new Set(goals.map(goal => goal.level))].sort();
@@ -320,7 +324,8 @@ const GoalBreaker = () => {
   const handleViewChange = (view: string) => {
     // When switching to canvas view, standardize all goal positions
     if (view === 'canvas' && currentView !== 'canvas' && goals.length > 0) {
-      const standardizedGoals = standardizeGoalPositions(goals, canvasSize.width, canvasSize.height, currentDirection);
+      const sortedGoals = getSortedGoals(goals);
+      const standardizedGoals = standardizeGoalPositions(sortedGoals, canvasSize.width, canvasSize.height, currentDirection);
       setGoals(standardizedGoals);
       
       // Force connections to update after switching to canvas
@@ -409,6 +414,7 @@ const GoalBreaker = () => {
       parentId: parentId,
       position: { x: 0, y: 0 }, // Temporary position
       isEditing: true,
+      priority: 'medium',
       children: []
     };
 
@@ -540,6 +546,7 @@ const GoalBreaker = () => {
       parentId: goal.parentId,
       position: newPosition,
       isEditing: true,
+      priority: 'medium',
       children: []
     };
 
@@ -577,6 +584,50 @@ const GoalBreaker = () => {
 
   const toggleFocus = (goalId) => {
     setFocusedGoal(focusedGoal === goalId ? null : goalId);
+  };
+
+  const setPriority = (goalId, priority) => {
+    const updatedGoals = goals.map(goal => 
+      goal.id === goalId 
+        ? { ...goal, priority: priority }
+        : goal
+    );
+    
+    // If sorting is enabled, immediately reposition goals
+    if (cardSorting === 'priority') {
+      const sortedGoals = getSortedGoals(updatedGoals);
+      const standardizedGoals = standardizeGoalPositions(sortedGoals, canvasSize.width, canvasSize.height, currentDirection);
+      setGoals(standardizedGoals);
+    } else {
+      setGoals(updatedGoals);
+    }
+  };
+
+  // Sort goals by priority within their level/parent groups
+  const getSortedGoals = (goalsToSort) => {
+    if (cardSorting === 'off') {
+      return goalsToSort;
+    }
+
+    // Priority order: high > medium > low
+    const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+    
+    return [...goalsToSort].sort((a, b) => {
+      // First, maintain hierarchy - parent level should come before children
+      if (a.level !== b.level) {
+        return a.level - b.level;
+      }
+      
+      // Within same level, sort by priority if they have the same parent
+      if (a.parentId === b.parentId) {
+        const aPriority = priorityOrder[a.priority || 'medium'];
+        const bPriority = priorityOrder[b.priority || 'medium'];
+        return aPriority - bPriority;
+      }
+      
+      // Keep original order for different parents at same level
+      return 0;
+    });
   };
 
   const handleCelebrationComplete = () => {
@@ -655,6 +706,7 @@ const GoalBreaker = () => {
       parentId: null,
       position: newPosition,
       isEditing: true,
+      priority: 'medium',
       children: []
     };
 
@@ -819,6 +871,8 @@ const GoalBreaker = () => {
         setCurrentDirection={setCurrentDirection}
         connectorStyle={connectorStyle}
         setConnectorStyle={setConnectorStyle}
+        cardSorting={cardSorting}
+        setCardSorting={setCardSorting}
         focusedGoal={focusedGoal}
         isMenuOpen={isMenuOpen}
         setIsMenuOpen={setIsMenuOpen}
@@ -886,7 +940,7 @@ const GoalBreaker = () => {
                 </div>
               </div>
             ) : (
-              getVisibleGoals().map(goal => {
+              getSortedGoals(getVisibleGoals()).map(goal => {
                 // Calculate transform for smooth dragging
                 const isDraggedCard = draggedGoal?.id === goal.id;
                 const dragTransform = (isDraggedCard && dragPreviewPosition) 
@@ -912,6 +966,7 @@ const GoalBreaker = () => {
                       onDelete={deleteGoal}
                       onStartEditing={startEditing}
                       onToggleFocus={toggleFocus}
+                      onSetPriority={setPriority}
                       isFocused={focusedGoal === goal.id}
                       isDragged={isDraggedCard}
                       onDragStart={handleGoalDragStart}

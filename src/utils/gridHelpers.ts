@@ -285,3 +285,186 @@ export const standardizeGoalPositions = (
   
   return goals;
 };;
+
+
+/**
+ * Calculate positions using cascading slot system
+ * Lower levels (deeper in hierarchy) take priority and determine spacing
+ * Each level "stretches" the levels above it
+ */
+export const calculateCascadingSlots = (
+  goals: Goal[],
+  canvasWidth: number,
+  canvasHeight: number,
+  direction: string = 'right-left'
+): Goal[] => {
+  console.log('🎯 Starting cascading slot calculation...');
+  
+  // Group goals by level
+  const levelGroups = new Map<number, Goal[]>();
+  goals.forEach(goal => {
+    if (!levelGroups.has(goal.level)) {
+      levelGroups.set(goal.level, []);
+    }
+    levelGroups.get(goal.level)!.push(goal);
+  });
+  
+  // Find the deepest level (highest number)
+  const maxLevel = Math.max(...goals.map(g => g.level));
+  console.log(`📊 Found ${maxLevel + 1} levels (0 to ${maxLevel})`);
+  
+  // STEP 1: Calculate slot requirements from deepest level upward
+  const slotSpacing = new Map<number, number>();
+  
+  // Base slot spacing (minimum gap between cards)
+  const BASE_SLOT_GAP = GRID.VERTICAL_GAP; // 40px minimum gap
+  const CARD_SLOT_SIZE = GRID.CARD_HEIGHT + BASE_SLOT_GAP; // 160px per slot
+  
+  // Start from deepest level and work upward
+  for (let level = maxLevel; level >= 0; level--) {
+    const goalsAtLevel = levelGroups.get(level) || [];
+    console.log(`🔧 Level ${level}: ${goalsAtLevel.length} goals`);
+    
+    if (level === maxLevel) {
+      // Deepest level: use base spacing
+      slotSpacing.set(level, CARD_SLOT_SIZE);
+      console.log(`  ✅ Base spacing: ${CARD_SLOT_SIZE}px`);
+    } else {
+      // Higher levels: calculate based on children's needs (RESTORE cascading)
+      let maxChildSpacing = CARD_SLOT_SIZE; // minimum spacing
+      
+      goalsAtLevel.forEach(parentGoal => {
+        const children = goals.filter(g => g.parentId === parentGoal.id);
+        if (children.length > 0) {
+          const childLevel = level + 1;
+          const childSpacing = slotSpacing.get(childLevel) || CARD_SLOT_SIZE;
+          const requiredSpacing = children.length * childSpacing;
+          maxChildSpacing = Math.max(maxChildSpacing, requiredSpacing);
+        }
+      });
+      
+      slotSpacing.set(level, maxChildSpacing);
+      console.log(`  ✅ Calculated spacing: ${maxChildSpacing}px (based on children)`);
+    }
+  }
+  
+  console.log('📐 Slot spacing calculated:', slotSpacing);
+  
+  // STEP 2: Position goals using calculated slot spacing
+  const positionedGoals = [...goals];
+  
+  // Position Level 0 (main goal) first
+  const level0Goals = levelGroups.get(0) || [];
+  level0Goals.forEach((goal, index) => {
+    if (direction === 'up-down') {
+      goal.position = {
+        x: (canvasWidth - GRID.CARD_WIDTH) / 2,
+        y: GRID.MARGIN + (index * slotSpacing.get(0)!)
+      };
+    } else if (direction === 'left-right') {
+      goal.position = {
+        x: GRID.MARGIN,
+        y: GRID.MARGIN + (index * slotSpacing.get(0)!)
+      };
+    } else if (direction === 'right-left') {
+      goal.position = {
+        x: canvasWidth - GRID.MARGIN - GRID.CARD_WIDTH,
+        y: GRID.MARGIN + (index * slotSpacing.get(0)!)
+      };
+    }
+  });
+  
+  // Position each subsequent level using their calculated slot spacing
+  for (let level = 1; level <= maxLevel; level++) {
+    const levelGoals = levelGroups.get(level) || [];
+    const levelSpacing = slotSpacing.get(level) || CARD_SLOT_SIZE;
+    
+    if (direction === 'up-down') {
+      // TOP-DOWN MODE: Group by parent (like horizontal modes) to maintain hierarchy
+      const y = GRID.MARGIN + (level * GRID.ROW_HEIGHT);
+      
+      // Group by parent (same as horizontal modes)
+      const parentGroups = new Map<number, Goal[]>();
+      levelGoals.forEach(goal => {
+        if (goal.parentId !== null) {
+          if (!parentGroups.has(goal.parentId)) {
+            parentGroups.set(goal.parentId, []);
+          }
+          parentGroups.get(goal.parentId)!.push(goal);
+        }
+      });
+      
+      // Sequential parent positioning: position parent groups left-to-right
+      let currentGroupX = GRID.MARGIN; // Start from left edge
+      const GROUP_GAP = 120; // Gap between parent groups
+      const CHILD_GAP = 80; // Gap between children within a group
+      
+      parentGroups.forEach((siblings, parentId) => {
+        const parent = positionedGoals.find(g => g.id === parentId);
+        if (!parent) return;
+        
+        // Calculate width needed for this parent group (parent + all children)
+        const totalCards = 1 + siblings.length; // parent + children
+        const totalGaps = Math.max(0, totalCards - 1); // gaps between cards
+        const groupWidth = totalCards * GRID.CARD_WIDTH + totalGaps * CHILD_GAP;
+        
+        // Position parent at start of group
+        parent.position = {
+          x: currentGroupX,
+          y: parent.position.y // Keep parent's original Y
+        };
+        
+        // Position children after parent
+        siblings.forEach((sibling, index) => {
+          sibling.position = {
+            x: currentGroupX + ((index + 1) * (GRID.CARD_WIDTH + CHILD_GAP)), // +1 to skip parent position
+            y: y
+          };
+        });
+        
+        // Move to next group position
+        currentGroupX += groupWidth + GROUP_GAP;
+      });
+    } else {
+      // HORIZONTAL MODES: Group by parent (original logic)
+      const parentGroups = new Map<number, Goal[]>();
+      levelGoals.forEach(goal => {
+        if (goal.parentId !== null) {
+          if (!parentGroups.has(goal.parentId)) {
+            parentGroups.set(goal.parentId, []);
+          }
+          parentGroups.get(goal.parentId)!.push(goal);
+        }
+      });
+      
+      // Position each group of siblings using cascading slots (prevents overlaps)
+      parentGroups.forEach((siblings, parentId) => {
+        const parent = positionedGoals.find(g => g.id === parentId);
+        if (!parent) return;
+        
+        siblings.forEach((sibling, index) => {
+          let x: number;
+          let y: number;
+          
+          if (direction === 'left-right') {
+            // Left-right: use pure slot spacing from parent position
+            x = GRID.MARGIN + (level * GRID.COLUMN_WIDTH);
+            y = parent.position.y + (index * levelSpacing);
+          } else {
+            // Right-left: use pure slot spacing from parent position
+            x = canvasWidth - GRID.MARGIN - ((level + 1) * GRID.COLUMN_WIDTH);
+            y = parent.position.y + (index * levelSpacing);
+          }
+          
+          sibling.position = {
+            x: Math.max(GRID.MARGIN, x),
+            y: Math.max(GRID.MARGIN, y)
+          };
+        });
+      });
+    }
+  }
+  
+  console.log('🎯 Slot positioning complete!', slotSpacing);
+  return positionedGoals;
+};

@@ -106,6 +106,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
   
   return (
     <div
+      data-goal-card="true"
       className={`absolute rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl cursor-move ${
         goal.completed ? 'bg-green-100' : levelStyle.bg
       } ${

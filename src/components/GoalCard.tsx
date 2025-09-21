@@ -42,6 +42,8 @@ const GoalCard: React.FC<GoalCardProps> = ({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const levelStyle = getLevelStyle(goal.level, goal.completed);
   
+  // Debug logging for isEditing state
+  
   // Get the appropriate color for selection based on level
   const selectionColors = [
     { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-600' }, // Level 0
@@ -288,7 +290,9 @@ const GoalCard: React.FC<GoalCardProps> = ({
         
         {/* Text content area */}
         <div className="flex-1 flex items-center justify-center pr-1">
-          {goal.isEditing ? (
+          {(() => {
+                      return goal.isEditing;
+          })() ? (
             <div className="relative flex-1 h-full flex items-center px-1">
               <textarea
                 defaultValue={goal.text}
@@ -337,6 +341,9 @@ const GoalCard: React.FC<GoalCardProps> = ({
                 goal.completed ? 'line-through text-green-700' : 'hover:bg-gray-200 text-gray-800'
               }`}
               onClick={(e) => {
+                console.log('📱 Text clicked! Goal ID:', goal.id);
+                console.log('📱 Goal level:', goal.level);
+                console.log('📱 Current isEditing:', goal.isEditing);
                 e.stopPropagation();
                 // Select card first, then start editing
                 onSelect(goal.id);

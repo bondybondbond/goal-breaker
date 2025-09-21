@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Check, X, Target, Edit3, Move, Eye, EyeOff, Focus, Menu } from 'lucide-react';
 import { gridToPosition, getNextRowForLevel, GRID, calculateChildPosition, standardizeGoalPositions, calculateCascadingSlots } from '../../utils/gridHelpers';
 import { getLevelStyle, getLevelStats, getLevelLabel } from '../../utils/styleHelpers';
@@ -12,6 +12,17 @@ type CelebrationType = 'humble' | 'nice' | 'awesome' | 'epic';
 
 const GoalBreaker = () => {
   const [goals, setGoals] = useState([]);
+  
+  // Debug wrapper for setGoals to track when isEditing changes
+  const setGoalsDebug = (newGoals) => {
+    const oldEditingGoals = goals.filter(g => g.isEditing).map(g => g.id);
+    const newEditingGoals = (typeof newGoals === 'function' ? newGoals(goals) : newGoals).filter(g => g.isEditing).map(g => g.id);
+    
+    if (oldEditingGoals.length !== newEditingGoals.length || oldEditingGoals.some(id => !newEditingGoals.includes(id))) {
+    }
+    
+    setGoals(newGoals);
+  };
   const [mainGoal, setMainGoal] = useState('');
   const [isStarted, setIsStarted] = useState(false);
   const [currentView, setCurrentView] = useState('canvas'); // 'canvas' or 'list'
@@ -25,6 +36,7 @@ const GoalBreaker = () => {
   const [canvasState, setCanvasState] = useState({ spacePressed: false, isPanning: false });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
+  const [suppressRepositioning, setSuppressRepositioning] = useState(false);
   
   // Celebration state - visual only, no messages
   const [celebration, setCelebration] = useState<{
@@ -176,17 +188,18 @@ const GoalBreaker = () => {
 
   // Re-position all goals when direction or sorting changes
   useEffect(() => {
-    if (goals.length > 0) {
+    // Don't reposition while any goal is being edited or when suppressed
+    const hasEditingGoals = goals.some(goal => goal.isEditing);
+    const editingGoalIds = goals.filter(g => g.isEditing).map(g => g.id);
+    
+    if (goals.length > 0 && !hasEditingGoals && !suppressRepositioning) {
       const sortedGoals = getSortedGoals(goals);
       const standardizedGoals = calculateCascadingSlots(sortedGoals, canvasSize.width, canvasSize.height, currentDirection);
-      setGoals(standardizedGoals);
+      setGoalsDebug(standardizedGoals);
       
-      // Force connections to update after a short delay to ensure goal positions are applied
-      setTimeout(() => {
-        setGoals(current => [...current]); // Trigger re-render to update connections
-      }, 10);
+
     }
-  }, [currentDirection, canvasSize.width, canvasSize.height, cardSorting]);
+  }, [currentDirection, canvasSize.width, canvasSize.height, cardSorting, suppressRepositioning]);
 
 
 
@@ -222,14 +235,28 @@ const GoalBreaker = () => {
         ? { ...goal, text: newText, isEditing: false }
         : goal
     ));
+    
+    // Reset suppression flag when editing ends
+    setSuppressRepositioning(false);
   };
 
   const startEditing = (id) => {
-    setGoals(goals.map(goal => 
+    // Temporarily suppress repositioning
+    setSuppressRepositioning(true);
+    
+    // Ensure only this goal is in editing mode
+    const updatedGoals = goals.map(goal => 
       goal.id === id 
         ? { ...goal, isEditing: true }
-        : goal
-    ));
+        : { ...goal, isEditing: false } // Ensure no other goals are editing
+    );
+    
+    setGoalsDebug(updatedGoals);
+    
+    // Re-enable repositioning after editing state is established
+    setTimeout(() => {
+      setSuppressRepositioning(false);
+    }, 150); // Slightly longer delay to ensure state is stable
   };
 
   const toggleComplete = (id) => {
@@ -313,12 +340,9 @@ const GoalBreaker = () => {
     if (view === 'canvas' && currentView !== 'canvas' && goals.length > 0) {
       const sortedGoals = getSortedGoals(goals);
       const standardizedGoals = standardizeGoalPositions(sortedGoals, canvasSize.width, canvasSize.height, currentDirection);
-      setGoals(standardizedGoals);
+      setGoalsDebug(standardizedGoals);
       
-      // Force connections to update after switching to canvas
-      setTimeout(() => {
-        setGoals(current => [...current]); // Trigger re-render for connections
-      }, 10);
+
     }
     setCurrentView(view);
   };

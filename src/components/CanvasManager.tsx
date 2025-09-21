@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Target } from 'lucide-react';
 import { ConnectionLines } from './ConnectionLines';
 import GoalCard from './GoalCard';
@@ -75,14 +75,27 @@ const CanvasManager: React.FC<CanvasManagerProps> = ({
 
   // Auto-focus canvas for keyboard events (fixes spacebar issue)
   useEffect(() => {
-    if (canvasRef.current) {
+    const hasEditingGoals = goals.some(goal => goal.isEditing);
+    if (canvasRef.current && !hasEditingGoals) {
       canvasRef.current.focus();
     }
   }, []);
+  
+  // Remove canvas focus when editing starts
+  useEffect(() => {
+    const hasEditingGoals = goals.some(goal => goal.isEditing);
+    if (hasEditingGoals && canvasRef.current && document.activeElement === canvasRef.current) {
+      canvasRef.current.blur();
+    } else if (!hasEditingGoals && canvasRef.current) {
+      canvasRef.current.focus();
+    }
+  }, [goals]);
 
   // Focus canvas when mouse enters (improves spacebar UX)
   const handleMouseEnter = () => {
-    if (canvasRef.current) {
+    // Don't steal focus if any goal is being edited
+    const hasEditingGoals = goals.some(goal => goal.isEditing);
+    if (canvasRef.current && !hasEditingGoals) {
       canvasRef.current.focus();
     }
   };
@@ -179,6 +192,12 @@ const CanvasManager: React.FC<CanvasManagerProps> = ({
   const handleCanvasKeyDown = (e) => {
     // Don't process shortcuts if user is editing text
     if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+      return;
+    }
+    
+    // Don't capture events if any goal is in editing mode
+    const hasEditingGoals = goals.some(goal => goal.isEditing);
+    if (hasEditingGoals) {
       return;
     }
 

@@ -7,8 +7,13 @@ src/
 ├── App.tsx                           # Entry point (12 lines)
 ├── components/
 │   ├── GoalBreakdown/
-│   │   └── index.tsx                 # Main component (~760 lines)
-│   └── ConnectionLines.tsx           # SVG line renderer (2 lines)
+│   │   └── index.tsx                 # Main component (~780 lines)
+│   ├── CanvasManager.tsx             # Canvas logic (220 lines) 🆕
+│   ├── GoalCard.tsx                  # Goal card component (290 lines)
+│   ├── ImportExport.tsx              # Import/export (180 lines)
+│   ├── ListView.tsx                  # List view (155 lines)
+│   ├── AppNavigation.tsx             # Header/navigation (174 lines)
+│   └── ConnectionLines.tsx           # SVG line renderer (180 lines)
 ├── types/goal.types.ts               # TypeScript interfaces
 └── docs/                             # This tracking system
 ```
@@ -26,15 +31,45 @@ Get-Process -Name "*node*" | Stop-Process -Force
 # Types: src/types/goal.types.ts
 ```
 
+## 🐛 Current Debugging (Ultimate Goal Text Bug)
+```javascript
+// DEBUGGING LOGS ADDED (9/20/2025):
+// GoalBreakdown/index.tsx - Line ~234
+startEditing() - Logs goal ID, state before/after, isEditing status
+
+// GoalCard.tsx - Line ~39
+Component render - Logs ID, level, isEditing on each render
+
+// GoalCard.tsx - Line ~339
+Text onClick - Logs click event, goal info, handler calls
+
+// Expected console flow when clicking ultimate goal text:
+// 1. 📱 Text clicked! Goal ID: [id]
+// 2. 🔥 startEditing called for goal ID: [id]
+// 3. 🔥 Goal to edit now has isEditing: true
+// 4. 🎯 GoalCard rendering - isEditing: true
+```
+
 ## 🎯 Core Functions to Find Quickly
 ```typescript
-// In GoalBreakdown/index.tsx - Search for these:
-- handleGoalDragStart()        # Line ~280 - Drag initiation
-- handleCanvasMouseMove()      # Line ~250 - Canvas pan + drag  
-- GoalCard()                   # Line ~350 - Goal card component
-- getVisibleGoals()            # Line ~180 - Filtering logic
-- gridToPosition()             # Line ~80 - Grid positioning
-- addSubGoal()                 # Line ~100 - Create sub-tasks
+// MAIN COMPONENT (GoalBreakdown/index.tsx):
+- addSubGoal()                   # Goal creation logic
+- addSiblingGoal()              # Sibling task creation  
+- getVisibleGoals()             # Filtering/focus logic
+- toggleComplete()              # Task completion
+
+// CANVAS MANAGER (CanvasManager.tsx):
+- handleGoalDragStart()         # Drag initiation
+- handleCanvasMouseMove()       # Canvas pan + drag
+- handleCanvasMouseDown()       # Event handling
+
+// GOAL CARD (GoalCard.tsx):
+- GoalCard component            # Individual goal rendering
+- handleMouseDown()             # Card interaction logic
+
+// GRID HELPERS (utils/gridHelpers.ts):
+- gridToPosition()              # Grid positioning
+- calculateCascadingSlots()     # Layout algorithm
 ```
 
 ## 🔍 Common Search Patterns
@@ -52,13 +87,20 @@ search_code pattern:"setDraggedGoal"
 
 ## 📊 Key State Variables
 ```typescript
-// Main state in GoalBreakdown component:
+// MAIN COMPONENT (GoalBreakdown):
 goals: Goal[]                  # All goal data
-draggedGoal: Goal | null       # Currently dragged goal
-canvasOffset: {x, y}          # Canvas pan position
-connections: Connection[]      # SVG line data
+connections: Connection[]      # SVG line data  
 focusedGoal: number | null     # Focus mode filter
 hiddenLevels: Set<number>      # Level visibility
+selectedGoal: number | null    # Selected card
+canvasState: {spacePressed, isPanning} # Canvas state from CanvasManager
+
+// CANVAS MANAGER:
+canvasOffset: {x, y}          # Canvas pan position
+draggedGoal: Goal | null      # Currently dragged goal
+dragPreviewPosition: {x, y}   # Smooth drag preview
+isPanning: boolean            # Panning state
+spacePressed: boolean         # Spacebar state
 ```
 
 ## 🎨 Grid System Constants
@@ -80,7 +122,9 @@ GRID = {
 5. **Update tracking files** - Keep context current
 
 ## 🐛 Common Issues & Solutions
-- **Drag not working**: Check global mouse listeners (line ~300)
-- **Canvas off-center**: Check canvasOffset initialization (line ~50)
-- **Goals not connecting**: Check connections useEffect (line ~330)
-- **Performance lag**: Look at getVisibleGoals filtering (line ~180)
+- **Drag not working**: Check CanvasManager.tsx handleGoalDragStart()
+- **Canvas panning issues**: Check CanvasManager.tsx event handlers
+- **Goals not connecting**: Check connections useEffect in main component  
+- **Performance lag**: Look at getVisibleGoals filtering in main component
+- **Helper text missing**: Check canvasState communication between components
+- **Card overlaps**: Check positioning functions in utils/gridHelpers.ts

@@ -298,7 +298,6 @@ export const calculateCascadingSlots = (
   canvasHeight: number,
   direction: string = 'right-left'
 ): Goal[] => {
-  console.log('🎯 Starting cascading slot calculation...');
   
   // Group goals by level
   const levelGroups = new Map<number, Goal[]>();
@@ -351,10 +350,20 @@ export const calculateCascadingSlots = (
   console.log('📐 Slot spacing calculated:', slotSpacing);
   
   // STEP 2: Position goals using calculated slot spacing
-  const positionedGoals = [...goals];
+  // Create deep copies to preserve ALL properties (including isEditing)
+  const positionedGoals = goals.map(goal => ({...goal}));
+  
+  // Create new level groups from the COPIED goals (not original)
+  const copiedLevelGroups = new Map<number, Goal[]>();
+  positionedGoals.forEach(goal => {
+    if (!copiedLevelGroups.has(goal.level)) {
+      copiedLevelGroups.set(goal.level, []);
+    }
+    copiedLevelGroups.get(goal.level)!.push(goal);
+  });
   
   // Position Level 0 (main goal) first
-  const level0Goals = levelGroups.get(0) || [];
+  const level0Goals = copiedLevelGroups.get(0) || [];
   level0Goals.forEach((goal, index) => {
     if (direction === 'up-down') {
       goal.position = {
@@ -376,7 +385,7 @@ export const calculateCascadingSlots = (
   
   // Position each subsequent level using their calculated slot spacing
   for (let level = 1; level <= maxLevel; level++) {
-    const levelGoals = levelGroups.get(level) || [];
+    const levelGoals = copiedLevelGroups.get(level) || [];
     const levelSpacing = slotSpacing.get(level) || CARD_SLOT_SIZE;
     
     if (direction === 'up-down') {

@@ -29,3 +29,14 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+
+# AI Assistant Files (Internal State - Don't Commit)
+.serena/memories/
+.serena/sessions/
+
+# Temporary Debugging Files
+docs/BUG_*_LOG.md
+docs/*_DEBUG.md
+
+# Personal Development Notes (Optional - Remove if You Want to Track These)
+# docs/DEVELOPMENT_LOG.md

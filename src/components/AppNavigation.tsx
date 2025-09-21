@@ -49,11 +49,7 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
             <div className="flex items-center gap-3">
               <Target className="text-yellow-600" size={24} />
               <h1 className="text-xl font-bold text-gray-800">Goal Breaker</h1>
-              {focusedGoal && (
-                <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Focus Mode Active
-                </div>
-              )}
+
             </div>
             
             <button
@@ -120,29 +116,7 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
               </button>
             </div>
             
-            {/* View Toggle */}
-            <div className="flex items-center bg-white rounded-lg p-1 shadow-lg border border-gray-200">
-              <button
-                onClick={() => onViewChange('canvas')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  currentView === 'canvas' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                Canvas
-              </button>
-              <button
-                onClick={() => onViewChange('list')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  currentView === 'list' 
-                    ? 'bg-blue-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                List
-              </button>
-            </div>
+
 
             {/* Share placeholder */}
             <button className="px-4 py-2 rounded-lg text-gray-400 bg-gray-50 cursor-not-allowed transition-colors">

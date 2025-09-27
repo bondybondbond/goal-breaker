@@ -345,9 +345,13 @@ const GoalCard: React.FC<GoalCardProps> = ({
                 console.log('📱 Goal level:', goal.level);
                 console.log('📱 Current isEditing:', goal.isEditing);
                 e.stopPropagation();
-                // Select card first, then start editing
-                onSelect(goal.id);
-                onStartEditing(goal.id);
+                
+                // If already selected, start editing. Otherwise, just select.
+                if (isSelected) {
+                  onStartEditing(goal.id);
+                } else {
+                  onSelect(goal.id);
+                }
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >

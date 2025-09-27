@@ -81,23 +81,22 @@ const CanvasManager: React.FC<CanvasManagerProps> = ({
     }
   }, []);
   
-  // Remove canvas focus when editing starts
+  // Remove canvas focus when editing starts - but don't auto-focus back
   useEffect(() => {
     const hasEditingGoals = goals.some(goal => goal.isEditing);
     if (hasEditingGoals && canvasRef.current && document.activeElement === canvasRef.current) {
       canvasRef.current.blur();
-    } else if (!hasEditingGoals && canvasRef.current) {
-      canvasRef.current.focus();
     }
+    // Removed aggressive auto-focus that might interfere with goal interactions
   }, [goals]);
 
-  // Focus canvas when mouse enters (improves spacebar UX)
+  // Focus canvas when mouse enters (improves spacebar UX) - DISABLED to prevent interference
   const handleMouseEnter = () => {
-    // Don't steal focus if any goal is being edited
-    const hasEditingGoals = goals.some(goal => goal.isEditing);
-    if (canvasRef.current && !hasEditingGoals) {
-      canvasRef.current.focus();
-    }
+    // Disabled auto-focus to prevent interference with goal card interactions
+    // const hasEditingGoals = goals.some(goal => goal.isEditing);
+    // if (canvasRef.current && !hasEditingGoals) {
+    //   canvasRef.current.focus();
+    // }
   };
 
   // Notify parent component of canvas state changes (for helper text)
@@ -271,7 +270,7 @@ const CanvasManager: React.FC<CanvasManagerProps> = ({
       onMouseMove={handleCanvasMouseMove}
       onMouseUp={handleCanvasMouseUp}
       onMouseDown={handleCanvasMouseDown}
-      onMouseEnter={handleMouseEnter}
+      // onMouseEnter={handleMouseEnter} // Disabled to prevent focus interference
       onKeyDown={handleCanvasKeyDown}
       onKeyUp={handleCanvasKeyUp}
       tabIndex={0}

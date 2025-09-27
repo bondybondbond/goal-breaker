@@ -299,29 +299,29 @@ const PPTGoalBreaker: React.FC = () => {
     setNextId(prev => prev + 1);
   }, [goals, nextId, currentDirection, canvasSize]);
 
-  // Global Tab handler for adding child to selected goal  
-  const [isAddingChild, setIsAddingChild] = useState(false);
-  
+  // Global Tab handler for adding child to selected goal (ONLY when not editing)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Only handle Tab if a goal is selected but NOT editing any goal
-      if (e.key === 'Tab' && selectedGoal && !isAddingChild) {
-        const anyGoalEditing = goals.some(g => g.isEditing);
+      // CRITICAL: Only handle Tab if NO goal is currently being edited
+      const anyGoalEditing = goals.some(g => g.isEditing);
+      
+      // Only proceed if:
+      // 1. Tab key was pressed
+      // 2. A goal is selected 
+      // 3. NO goals are currently being edited (this prevents the double creation bug)
+      if (e.key === 'Tab' && selectedGoal && !anyGoalEditing) {
         const selectedGoalObj = goals.find(g => g.id === selectedGoal);
         
-        if (selectedGoalObj && !anyGoalEditing) {
+        if (selectedGoalObj) {
           e.preventDefault();
-          setIsAddingChild(true); // Prevent double-firing
           handleAddChild(selectedGoal);
-          // Reset flag after a short delay
-          setTimeout(() => setIsAddingChild(false), 200);
         }
       }
     };
     
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [selectedGoal, goals, handleAddChild, isAddingChild]);
+  }, [selectedGoal, goals, handleAddChild]);
 
   // Select a goal
   const handleSelectGoal = useCallback((goalId: number) => {

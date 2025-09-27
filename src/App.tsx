@@ -1,10 +1,10 @@
 import React from 'react';
-import PPTGoalBreaker from './components/PPTGoalBreaker';
+import SimpleGoalBreaker from './components/SimpleGoalBreaker';
 
 function App() {
   return (
     <div className="App">
-      <PPTGoalBreaker />
+      <SimpleGoalBreaker />
     </div>
   );
 }

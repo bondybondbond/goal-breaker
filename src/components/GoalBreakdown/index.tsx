@@ -716,7 +716,7 @@ const GoalBreaker = () => {
       gridRow: newRow,
       parentId: null,
       position: newPosition,
-      isEditing: true,
+      isEditing: false, // Don't start editing immediately - wait for user to click
       priority: 'medium',
       children: []
     };

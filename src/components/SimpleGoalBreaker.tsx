@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { ConnectionLines } from './ConnectionLines';
+import { Connection } from '../types/goal.types';
 
 interface SimpleGoal {
   id: number;
@@ -33,10 +35,10 @@ const SimpleGoalBreaker: React.FC = () => {
   // RECALCULATE ALL POSITIONS - PowerPoint Style
   // Now accepts goals array as parameter to avoid closure issues
   const recalculatePositions = (goalsArray: SimpleGoal[]): SimpleGoal[] => {
-    const CARD_WIDTH = 220;
-    const CARD_HEIGHT = 80;
-    const HORIZONTAL_GAP = 30;
-    const VERTICAL_GAP = 40;
+    const CARD_WIDTH = 160;
+    const CARD_HEIGHT = 75;
+    const HORIZONTAL_GAP = 40; // Increased from 25 for better spacing
+    const VERTICAL_GAP = 40; // Balanced spacing between vertical cards
     
     const newPositions = new Map<number, { x: number; y: number }>();
     
@@ -204,6 +206,18 @@ const SimpleGoalBreaker: React.FC = () => {
     return goals.filter(goal => goal.parentId === parentId);
   };
 
+  // Calculate dynamic font size based on text content (like PowerPoint)
+  const calculateFontSize = (text: string): number => {
+    const charCount = text.length;
+    
+    // PPT-style logic: more content = smaller font
+    if (charCount < 30) return 16; // Short text = large font
+    if (charCount < 60) return 14; // Medium text
+    if (charCount < 100) return 12; // Longer text
+    if (charCount < 150) return 11; // Much longer
+    return 10; // Very long text = minimum readable size
+  };
+
   // Render a goal with absolute positioning
   const renderGoal = (goal: SimpleGoal) => {
     // Calculate goal level for coloring
@@ -221,76 +235,136 @@ const SimpleGoalBreaker: React.FC = () => {
     const bgColor = levelColors[level % levelColors.length];
     
     return (
-      <div 
-        key={goal.id} 
-        style={{ 
-          position: 'absolute',
-          left: goal.position.x,
-          top: goal.position.y,
-          border: '2px solid #666', 
-          padding: '10px', 
-          backgroundColor: bgColor,
-          minWidth: '200px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}
-      >
-        <input
-          type="text"
-          value={goal.text}
-          onChange={(e) => updateGoalText(goal.id, e.target.value)}
+      <>
+        {/* Main card */}
+        <div 
+          key={goal.id} 
           style={{ 
-            border: 'none', 
-            outline: 'none', 
-            width: '100%',
-            backgroundColor: 'transparent'
+            position: 'absolute',
+            left: goal.position.x,
+            top: goal.position.y,
+            border: '1px solid #999', 
+            padding: '6px', 
+            backgroundColor: bgColor,
+            width: '160px', // FIXED width - never shrinks
+            boxSizing: 'border-box', // Include padding in width
+            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+            fontSize: '13px'
           }}
-        />
-        <div style={{ marginTop: 5, fontSize: '12px' }}>
-          <button 
-            onClick={() => addChild(goal.id)}
-            style={{ marginRight: 5, fontSize: '10px' }}
-          >
-            + Child
-          </button>
-          <button 
-            onClick={() => addSibling(goal.id)}
-            style={{ fontSize: '10px' }}
-          >
-            + Sibling
-          </button>
-          <span style={{ marginLeft: 10, color: '#666' }}>
-            ID: {goal.id} | L{level} | {isLeaf ? '🍃' : '🌳'}
-          </span>
+        >
+          <textarea
+            value={goal.text}
+            onChange={(e) => updateGoalText(goal.id, e.target.value)}
+            style={{ 
+              border: 'none', 
+              outline: 'none', 
+              width: '100%',
+              height: '60px',
+              resize: 'none',
+              backgroundColor: 'transparent',
+              fontSize: `${calculateFontSize(goal.text)}px`, // DYNAMIC font size (PPT-style)
+              fontFamily: 'inherit',
+              textAlign: 'center',
+              overflow: 'hidden', // NO SCROLLBAR
+              lineHeight: '1.3',
+              padding: '12px 4px'
+            }}
+          />
         </div>
-      </div>
+
+        {/* Add Child button - below card */}
+        <button
+          key={`child-${goal.id}`}
+          onClick={() => addChild(goal.id)}
+          style={{
+            position: 'absolute',
+            left: goal.position.x + 70, // Center below card
+            top: goal.position.y + 85, // 10px gap below card
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            border: '1px solid #999',
+            backgroundColor: levelColors[(level + 1) % levelColors.length], // Next level color
+            fontSize: '14px',
+            cursor: 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+          }}
+          title="Add child"
+        >
+          +
+        </button>
+
+        {/* Add Sibling button - right of card (only if not level 0) */}
+        {goal.parentId && (
+          <button
+            key={`sibling-${goal.id}`}
+            onClick={() => addSibling(goal.id)}
+            style={{
+              position: 'absolute',
+              left: goal.position.x + 165, // Right of card with smaller gap
+              top: goal.position.y + 28, // Vertically centered
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              border: '1px solid #999',
+              backgroundColor: levelColors[level % levelColors.length], // Same level color
+              fontSize: '14px',
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}
+            title="Add sibling"
+          >
+            +
+          </button>
+        )}
+      </>
     );
   };
 
-
+  // Generate connections between parent and child goals
+  const generateConnections = (): Connection[] => {
+    const connections: Connection[] = [];
+    const CARD_WIDTH = 160;
+    const CARD_HEIGHT = 75;
+    
+    goals.forEach(goal => {
+      if (goal.parentId) {
+        const parent = goals.find(g => g.id === goal.parentId);
+        if (parent) {
+          connections.push({
+            id: `${parent.id}-${goal.id}`,
+            from: {
+              x: parent.position.x + CARD_WIDTH / 2,
+              y: parent.position.y + CARD_HEIGHT
+            },
+            to: {
+              x: goal.position.x + CARD_WIDTH / 2,
+              y: goal.position.y
+            },
+            completed: false,
+            path: ''
+          });
+        }
+      }
+    });
+    
+    return connections;
+  };
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2>🔍 Simple Goal Breaker (Debug Version)</h2>
-      <p style={{ color: '#666', marginBottom: '20px' }}>
-        Total goals: {goals.length} | Next ID: {nextId}
-      </p>
+      <h2>🎯 Goal Breaker</h2>
+
       
-      {/* Debug info */}
-      <div style={{ 
-        backgroundColor: '#f0f0f0', 
-        padding: '10px', 
-        marginBottom: '20px',
-        fontSize: '12px'
-      }}>
-        <strong>All Goals:</strong><br/>
-        {goals.map(g => {
-          const isLeaf = isLeafGoal(g.id);
-          const atDeepest = isAtDeepestLevel(g.id);
-          return `ID:${g.id} "${g.text}" (parent:${g.parentId}) ${isLeaf ? '🍃' : '🌳'} ${atDeepest ? '⬇️' : '➡️'}`;
-        }).join(', ')}
-        <br/><br/>
-        <strong>PowerPoint SmartArt Logic:</strong> ⬇️ = At deepest level (children grow vertically), ➡️ = Not deepest (children grow horizontally)
-      </div>
+
 
       {/* Canvas area with positioned goals */}
       <div style={{ 
@@ -301,6 +375,15 @@ const SimpleGoalBreaker: React.FC = () => {
         backgroundColor: '#fafafa',
         overflow: 'auto'
       }}>
+        {/* Connection Lines - behind cards */}
+        <ConnectionLines 
+          connections={generateConnections()}
+          canvasSize={{ width: 1200, height: 1200 }}
+          connectorStyle='straight'
+          direction='up-down'
+        />
+        
+        {/* Goal Cards - on top */}
         {goals.map(goal => renderGoal(goal))}
       </div>
     </div>

@@ -34,6 +34,9 @@ Thumbs.db
 .serena/memories/
 .serena/sessions/
 
+# Archived Components (Don't Deploy)
+src/components/__archive__/
+
 # Temporary Debugging Files
 docs/BUG_*_LOG.md
 docs/*_DEBUG.md

@@ -15,91 +15,70 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
 
   return (
     <svg
-      className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
-      style={{ width: canvasSize.width, height: canvasSize.height }}
+      className="absolute top-0 left-0 w-full h-full pointer-events-none"
+      style={{ 
+        width: canvasSize.width, 
+        height: canvasSize.height,
+        zIndex: 0  // Behind cards
+      }}
     >
       {/* Arrow marker definitions with unique IDs */}
       <defs>
         <marker
           id={markerId}
-          viewBox="0 0 14 14"
-          refX="12"
-          refY="7"
-          markerWidth="12"
-          markerHeight="12"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
           orient="auto"
           markerUnits="strokeWidth"
         >
           <path 
-            d="M1,3 L1,11 L12,7 z" 
-            fill="#6b7280" 
-            stroke="#6b7280" 
-            strokeWidth="1"
+            d="M0,0 L0,10 L10,5 z" 
+            fill="#000000" 
           />
         </marker>
         <marker
           id={markerCompletedId}
-          viewBox="0 0 14 14"
-          refX="12"
-          refY="7"
-          markerWidth="12"
-          markerHeight="12"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
           orient="auto"
           markerUnits="strokeWidth"
         >
           <path 
-            d="M1,3 L1,11 L12,7 z" 
+            d="M0,0 L0,10 L10,5 z" 
             fill="#10b981" 
-            stroke="#10b981" 
-            strokeWidth="1"
           />
         </marker>
       </defs>
 
-      {connections.map(conn => {
-        // Generate path based on connector style
-        let pathData = conn.path;
-        
-        if (connectorStyle === 'straight') {
-          // Create elbow/right-angle path
-          const fromX = conn.from.x;
-          const fromY = conn.from.y;
-          const toX = conn.to.x;
-          const toY = conn.to.y;
-          
-          if (direction === 'up-down') {
-            // For top-down: vertical then horizontal
-            const midY = fromY + (toY - fromY) * 0.5;
-            pathData = `M ${fromX} ${fromY} L ${fromX} ${midY} L ${toX} ${midY} L ${toX} ${toY}`;
-          } else {
-            // For left-right and right-left: horizontal then vertical
-            const midX = fromX + (toX - fromX) * 0.5;
-            pathData = `M ${fromX} ${fromY} L ${midX} ${fromY} L ${midX} ${toY} L ${toX} ${toY}`;
-          }
-        }
-        // For curved, use the existing conn.path (which should be curved)
+{connections.map(conn => {
+        // Generate simple straight line path
+        const pathData = `M ${conn.from.x} ${conn.from.y} L ${conn.to.x} ${conn.to.y}`;
         
         return (
           <g key={conn.id}>
             <path
               d={pathData}
-              stroke={conn.completed ? "#10b981" : "#6b7280"}
-              strokeWidth="2"
+              stroke={conn.completed ? "#10b981" : "#000000"}
+              strokeWidth="1.5"
               fill="none"
-              strokeDasharray="none"
               strokeLinecap="round"
-              strokeLinejoin="round"
               className="transition-all duration-300"
               markerEnd={conn.type !== 'placeholder' ? `url(#${conn.completed ? markerCompletedId : markerId})` : undefined}
             />
             
-            {/* Connection point on parent (start) */}
+            {/* Connection point on parent (start) - minimal */}
             <circle
               cx={conn.from.x}
               cy={conn.from.y}
-              r="3"
-              fill={conn.completed ? "#10b981" : "#6b7280"}
-              className="transition-all duration-300"
+              r="2"
+              fill={conn.completed ? "#10b981" : "#000000"}
+              className="transition-all duration-200"
             />
             
             {/* Different rendering for placeholder vs normal connections */}
@@ -127,13 +106,13 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
                 </text>
               </g>
             ) : (
-              /* Normal connection point on child (end) - smaller since we have arrow now */
+              /* Normal connection point on child (end) - minimal */
               <circle
                 cx={conn.to.x}
                 cy={conn.to.y}
                 r="2"
-                fill={conn.completed ? "#10b981" : "#6b7280"}
-                className="transition-all duration-300"
+                fill={conn.completed ? "#10b981" : "#000000"}
+                className="transition-all duration-200"
               />
             )}
           </g>

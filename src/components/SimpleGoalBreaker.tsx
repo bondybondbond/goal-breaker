@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ConnectionLines } from './ConnectionLines';
 import { Connection } from '../types/goal.types';
 
@@ -14,6 +14,83 @@ const SimpleGoalBreaker: React.FC = () => {
     { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
   ]);
   const [nextId, setNextId] = useState(2);
+
+  // ===== PANNING STATE =====
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [spacePressed, setSpacePressed] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Global spacebar detection for panning
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && document.activeElement?.tagName !== 'TEXTAREA') {
+        setSpacePressed(true);
+        e.preventDefault();
+      }
+    };
+
+    const handleGlobalKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setSpacePressed(false);
+        setPanStart({ x: 0, y: 0 });
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    document.addEventListener('keyup', handleGlobalKeyUp);
+
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+      document.removeEventListener('keyup', handleGlobalKeyUp);
+    };
+  }, []);
+
+  // ===== PANNING EVENT HANDLERS =====
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    const isMiddleButton = e.button === 1;
+    
+    if (isMiddleButton) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY });
+      e.preventDefault();
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    // Handle middle mouse panning
+    if (isPanning) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+      setCanvasOffset(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      setPanStart({ x: e.clientX, y: e.clientY });
+    }
+    
+    // Handle spacebar + mouse panning
+    if (spacePressed && !isPanning) {
+      if (!panStart.x && !panStart.y) {
+        setPanStart({ x: e.clientX, y: e.clientY });
+      } else {
+        const deltaX = e.clientX - panStart.x;
+        const deltaY = e.clientY - panStart.y;
+        setCanvasOffset(prev => ({
+          x: prev.x + deltaX,
+          y: prev.y + deltaY
+        }));
+        setPanStart({ x: e.clientX, y: e.clientY });
+      }
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsPanning(false);
+  };
+
+
 
   // Helper: Check if a goal is a leaf (no children)
   const isLeafGoal = (goalId: number): boolean => {
@@ -361,30 +438,46 @@ const SimpleGoalBreaker: React.FC = () => {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2>🎯 Goal Breaker</h2>
+      <h2 style={{ outline: 'none', userSelect: 'none' }}>🎯 Goal Breaker</h2>
 
       
 
 
-      {/* Canvas area with positioned goals */}
-      <div style={{ 
-        position: 'relative', 
-        width: '100%', 
-        height: '1200px', 
-        border: '1px dashed #ccc',
-        backgroundColor: '#fafafa',
-        overflow: 'auto'
-      }}>
-        {/* Connection Lines - behind cards */}
-        <ConnectionLines 
-          connections={generateConnections()}
-          canvasSize={{ width: 1200, height: 1200 }}
-          connectorStyle='straight'
-          direction='up-down'
-        />
-        
-        {/* Goal Cards - on top */}
-        {goals.map(goal => renderGoal(goal))}
+      {/* Canvas area with positioned goals - WITH PANNING */}
+      <div 
+        ref={canvasRef}
+        className={`relative w-full overflow-hidden ${isPanning ? 'cursor-grabbing' : spacePressed ? 'cursor-grabbing' : 'cursor-default'}`}
+        style={{ 
+          height: '800px',
+          border: '1px dashed #ccc',
+          backgroundColor: '#fafafa',
+          outline: 'none'
+        }}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseDown={handleCanvasMouseDown}
+      >
+        {/* Panning Container */}
+        <div
+          style={{
+            width: '2400px', // Larger canvas for panning
+            height: '1600px',
+            transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)`,
+            transformOrigin: '0 0',
+            backgroundColor: 'transparent'
+          }}
+        >
+          {/* Connection Lines - behind cards */}
+          <ConnectionLines 
+            connections={generateConnections()}
+            canvasSize={{ width: 2400, height: 1600 }}
+            connectorStyle='straight'
+            direction='up-down'
+          />
+          
+          {/* Goal Cards - on top */}
+          {goals.map(goal => renderGoal(goal))}
+        </div>
       </div>
     </div>
   );

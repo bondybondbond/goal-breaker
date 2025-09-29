@@ -36,6 +36,7 @@ Thumbs.db
 
 # Archived Components (Don't Deploy)
 src/components/__archive__/
+src/utils/__archive__/
 
 # Temporary Debugging Files
 docs/BUG_*_LOG.md

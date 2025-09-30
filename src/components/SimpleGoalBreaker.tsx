@@ -14,6 +14,9 @@ const SimpleGoalBreaker: React.FC = () => {
     { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
   ]);
   const [nextId, setNextId] = useState(2);
+  
+  // ===== SELECTION STATE =====
+  const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
 
   // ===== PANNING STATE =====
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -46,6 +49,16 @@ const SimpleGoalBreaker: React.FC = () => {
       document.removeEventListener('keyup', handleGlobalKeyUp);
     };
   }, []);
+
+  // ===== SELECTION HANDLERS =====
+  const handleCardClick = (goalId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent canvas deselect
+    setSelectedGoalId(goalId);
+  };
+
+  const handleCanvasClick = () => {
+    setSelectedGoalId(null); // Deselect when clicking canvas
+  };
 
   // ===== PANNING EVENT HANDLERS =====
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -295,6 +308,105 @@ const SimpleGoalBreaker: React.FC = () => {
     return 10; // Very long text = minimum readable size
   };
 
+  // Render toolbar above selected card
+  const renderToolbar = (goal: SimpleGoal) => {
+    if (selectedGoalId !== goal.id) return null;
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: goal.position.x + 160 - 69, // Right-align: card width (160px) - buttons (23*3=69px)
+          top: goal.position.y - 26, // Just above card
+          display: 'flex',
+          gap: '0', // No gap - buttons touch
+          zIndex: 1000 // On top of everything
+        }}
+      >
+        {/* Priority button (placeholder for now) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            // TODO: Priority functionality
+          }}
+          style={{
+            width: '23px',
+            height: '23px',
+            border: '1px solid #ddd',
+            backgroundColor: 'white',
+            borderRadius: '0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0
+          }}
+          title="Set priority"
+        >
+          <div style={{
+            width: 0,
+            height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderBottom: '7px solid #4A90E2'
+          }} />
+        </button>
+
+        {/* Complete button (placeholder for now) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            // TODO: Complete functionality
+          }}
+          style={{
+            width: '23px',
+            height: '23px',
+            border: '1px solid #ddd',
+            backgroundColor: 'white',
+            borderRadius: '0',
+            cursor: 'pointer',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#22C55E',
+            fontWeight: 'bold',
+            padding: 0
+          }}
+          title="Mark as complete"
+        >
+          ✔
+        </button>
+
+        {/* Delete button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            // TODO: Delete functionality
+          }}
+          style={{
+            width: '23px',
+            height: '23px',
+            border: '1px solid #ddd',
+            backgroundColor: 'white',
+            borderRadius: '0',
+            cursor: 'pointer',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#E94B8B',
+            fontWeight: 'bold',
+            padding: 0
+          }}
+          title="Delete goal"
+        >
+          ✖
+        </button>
+      </div>
+    );
+  };
+
   // Render a goal with absolute positioning
   const renderGoal = (goal: SimpleGoal) => {
     // Calculate goal level for coloring
@@ -316,17 +428,21 @@ const SimpleGoalBreaker: React.FC = () => {
         {/* Main card */}
         <div 
           key={goal.id} 
+          onClick={(e) => handleCardClick(goal.id, e)}
           style={{ 
             position: 'absolute',
             left: goal.position.x,
             top: goal.position.y,
             border: '1px solid #999', 
+            outline: selectedGoalId === goal.id ? '2px solid #333' : 'none',
+            outlineOffset: '-1px',
             padding: '6px', 
             backgroundColor: bgColor,
             width: '160px', // FIXED width - never shrinks
             boxSizing: 'border-box', // Include padding in width
             boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-            fontSize: '13px'
+            fontSize: '13px',
+            cursor: 'pointer'
           }}
         >
           <textarea
@@ -456,6 +572,7 @@ const SimpleGoalBreaker: React.FC = () => {
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
         onMouseDown={handleCanvasMouseDown}
+        onClick={handleCanvasClick}
       >
         {/* Panning Container */}
         <div
@@ -477,6 +594,11 @@ const SimpleGoalBreaker: React.FC = () => {
           
           {/* Goal Cards - on top */}
           {goals.map(goal => renderGoal(goal))}
+          
+          {/* Toolbar - highest priority (rendered last = on top) */}
+          {selectedGoalId && goals.find(g => g.id === selectedGoalId) && 
+            renderToolbar(goals.find(g => g.id === selectedGoalId)!)
+          }
         </div>
       </div>
     </div>

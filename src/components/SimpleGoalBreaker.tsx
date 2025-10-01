@@ -17,6 +17,7 @@ const SimpleGoalBreaker: React.FC = () => {
   
   // ===== SELECTION STATE =====
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
+  const [helperText, setHelperText] = useState('');
 
   // ===== PANNING STATE =====
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -49,6 +50,71 @@ const SimpleGoalBreaker: React.FC = () => {
       document.removeEventListener('keyup', handleGlobalKeyUp);
     };
   }, []);
+
+  // Helper text based on selection
+  useEffect(() => {
+    const updateHelperText = () => {
+      // Don't show helper text if user is editing (textarea focused)
+      if (document.activeElement?.tagName === 'TEXTAREA') {
+        setHelperText('');
+        return;
+      }
+
+      if (selectedGoalId) {
+        const selectedGoal = goals.find(g => g.id === selectedGoalId);
+        if (selectedGoal) {
+          if (!selectedGoal.parentId) {
+            // Main goal - no sibling option
+            setHelperText('[Tab] to add child');
+          } else {
+            // Other goals - show both options
+            setHelperText('[Tab] to add child, [Enter] to add sibling');
+          }
+        }
+      } else {
+        setHelperText(''); // No helper text when nothing selected
+      }
+    };
+
+    // Update on mount/change
+    updateHelperText();
+
+    // Also listen for focus changes globally
+    const handleFocusChange = () => updateHelperText();
+    document.addEventListener('focusin', handleFocusChange);
+    document.addEventListener('focusout', handleFocusChange);
+
+    return () => {
+      document.removeEventListener('focusin', handleFocusChange);
+      document.removeEventListener('focusout', handleFocusChange);
+    };
+  }, [selectedGoalId, goals]);
+
+  // Keyboard shortcuts for adding child (Tab) and sibling (Enter)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in a textarea
+      if (document.activeElement?.tagName === 'TEXTAREA') return;
+      
+      // Only work if a goal is selected
+      if (!selectedGoalId) return;
+
+      const selectedGoal = goals.find(g => g.id === selectedGoalId);
+      if (!selectedGoal) return;
+
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        addChild(selectedGoalId);
+      } else if (e.key === 'Enter' && selectedGoal.parentId) {
+        // Only allow Enter for non-main goals (those with parentId)
+        e.preventDefault();
+        addSibling(selectedGoalId);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedGoalId, goals]);
 
   // ===== SELECTION HANDLERS =====
   const handleCardClick = (goalId: number, e: React.MouseEvent) => {
@@ -466,33 +532,35 @@ const SimpleGoalBreaker: React.FC = () => {
         </div>
 
         {/* Add Child button - below card */}
-        <button
-          key={`child-${goal.id}`}
-          onClick={() => addChild(goal.id)}
-          style={{
-            position: 'absolute',
-            left: goal.position.x + 70, // Center below card
-            top: goal.position.y + 85, // 10px gap below card
-            width: '20px',
-            height: '20px',
-            borderRadius: '50%',
-            border: '1px solid #999',
-            backgroundColor: levelColors[(level + 1) % levelColors.length], // Next level color
-            fontSize: '14px',
-            cursor: 'pointer',
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-          }}
-          title="Add child"
-        >
-          +
-        </button>
+        {selectedGoalId === goal.id && (
+          <button
+            key={`child-${goal.id}`}
+            onClick={() => addChild(goal.id)}
+            style={{
+              position: 'absolute',
+              left: goal.position.x + 70, // Center below card
+              top: goal.position.y + 85, // 10px gap below card
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              border: '1px solid #999',
+              backgroundColor: levelColors[(level + 1) % levelColors.length], // Next level color
+              fontSize: '14px',
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}
+            title="Add child"
+          >
+            +
+          </button>
+        )}
 
         {/* Add Sibling button - right of card (only if not level 0) */}
-        {goal.parentId && (
+        {selectedGoalId === goal.id && goal.parentId && (
           <button
             key={`sibling-${goal.id}`}
             onClick={() => addSibling(goal.id)}
@@ -566,7 +634,7 @@ const SimpleGoalBreaker: React.FC = () => {
         style={{ 
           height: '800px',
           border: '1px dashed #ccc',
-          backgroundColor: '#fafafa',
+          backgroundColor: '#EFF3FF',
           outline: 'none'
         }}
         onMouseMove={handleCanvasMouseMove}
@@ -601,6 +669,61 @@ const SimpleGoalBreaker: React.FC = () => {
           }
         </div>
       </div>
+
+      {/* Helper Text - Bottom Center */}
+      {helperText && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          backgroundColor: '#D9D9D9',
+          color: 'black',
+          padding: '8px 16px',
+          borderRadius: '8px',
+          boxShadow: 'none',
+          fontSize: '14px',
+          textAlign: 'center',
+          maxWidth: '500px'
+        }}>
+          {helperText === '[Tab] to add child' ? (
+            <span>
+              <kbd style={{
+                padding: '2px 8px',
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                border: '1px solid #9CA3AF',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: 'black'
+              }}>Tab</kbd> to add child
+            </span>
+          ) : helperText === '[Tab] to add child, [Enter] to add sibling' ? (
+            <span>
+              <kbd style={{
+                padding: '2px 8px',
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                border: '1px solid #9CA3AF',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: 'black'
+              }}>Tab</kbd> to add child, <kbd style={{
+                padding: '2px 8px',
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                border: '1px solid #9CA3AF',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: 'black'
+              }}>Enter</kbd> to add sibling
+            </span>
+          ) : (
+            <span>{helperText}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 };

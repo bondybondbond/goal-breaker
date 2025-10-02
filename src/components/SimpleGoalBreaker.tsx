@@ -7,6 +7,7 @@ interface SimpleGoal {
   text: string;
   parentId?: number;
   position: { x: number; y: number };
+  completed?: boolean; // Track completion state
 }
 
 const SimpleGoalBreaker: React.FC = () => {
@@ -342,18 +343,69 @@ const SimpleGoalBreaker: React.FC = () => {
     
     setGoals(prev => {
       const updated = [...prev, newGoal];
-      return updated;
+      // Recalculate positions immediately with the new goal (same as addChild)
+      return recalculatePositions(updated);
     });
     setNextId(prev => prev + 1);
-    
-    // Recalculate layout after adding
-    setTimeout(() => recalculateAllPositions(), 0);
   };
 
   // Update goal text
   const updateGoalText = (id: number, newText: string) => {
     setGoals(prev => prev.map(goal => 
       goal.id === id ? { ...goal, text: newText } : goal
+    ));
+  };
+
+  // Helper: Get all descendant IDs recursively (for deletion)
+  const getAllDescendantIds = (goalId: number): number[] => {
+    const children = goals.filter(g => g.parentId === goalId);
+    const descendantIds: number[] = [];
+    
+    children.forEach(child => {
+      descendantIds.push(child.id);
+      descendantIds.push(...getAllDescendantIds(child.id)); // Recursive
+    });
+    
+    return descendantIds;
+  };
+
+  // Delete a goal and all its children
+  const deleteGoal = (goalId: number) => {
+    const goalToDelete = goals.find(g => g.id === goalId);
+    if (!goalToDelete) return;
+
+    // Prevent deleting the main goal (root)
+    if (goalToDelete.parentId === undefined) {
+      return; // Can't delete main goal
+    }
+
+    // Confirmation dialog
+    if (!window.confirm("Delete this goal and all its sub-goals?")) {
+      return; // User cancelled
+    }
+
+    // Get all IDs to delete (goal + all descendants)
+    const idsToDelete = [goalId, ...getAllDescendantIds(goalId)];
+    
+    // Filter out deleted goals and recalculate positions
+    setGoals(prev => {
+      const filtered = prev.filter(goal => !idsToDelete.includes(goal.id));
+      return recalculatePositions(filtered); // Reposition remaining goals
+    });
+    
+    // Clear selection if deleted goal was selected
+    if (selectedGoalId && idsToDelete.includes(selectedGoalId)) {
+      setSelectedGoalId(null);
+      setHelperText('');
+    }
+  };
+
+  // Toggle goal completion status
+  const toggleComplete = (goalId: number) => {
+    setGoals(prev => prev.map(goal => 
+      goal.id === goalId 
+        ? { ...goal, completed: !goal.completed } 
+        : goal
     ));
   };
 
@@ -418,17 +470,17 @@ const SimpleGoalBreaker: React.FC = () => {
           }} />
         </button>
 
-        {/* Complete button (placeholder for now) */}
+        {/* Complete button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
-            // TODO: Complete functionality
+            toggleComplete(goal.id);
           }}
           style={{
             width: '23px',
             height: '23px',
             border: '1px solid #ddd',
-            backgroundColor: 'white',
+            backgroundColor: goal.completed ? '#c8e6c9' : 'white', // Green when completed
             borderRadius: '0',
             cursor: 'pointer',
             fontSize: '13px',
@@ -439,36 +491,38 @@ const SimpleGoalBreaker: React.FC = () => {
             fontWeight: 'bold',
             padding: 0
           }}
-          title="Mark as complete"
+          title={goal.completed ? "Mark as incomplete" : "Mark as complete"}
         >
           ✔
         </button>
 
-        {/* Delete button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            // TODO: Delete functionality
-          }}
-          style={{
-            width: '23px',
-            height: '23px',
-            border: '1px solid #ddd',
-            backgroundColor: 'white',
-            borderRadius: '0',
-            cursor: 'pointer',
-            fontSize: '13px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#E94B8B',
-            fontWeight: 'bold',
-            padding: 0
-          }}
-          title="Delete goal"
-        >
-          ✖
-        </button>
+        {/* Delete button - hidden for main goal */}
+        {goal.parentId !== undefined && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteGoal(goal.id);
+            }}
+            style={{
+              width: '23px',
+              height: '23px',
+              border: '1px solid #ddd',
+              backgroundColor: 'white',
+              borderRadius: '0',
+              cursor: 'pointer',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#E94B8B',
+              fontWeight: 'bold',
+              padding: 0
+            }}
+            title="Delete goal"
+          >
+            ✖
+          </button>
+        )}
       </div>
     );
   };
@@ -485,9 +539,10 @@ const SimpleGoalBreaker: React.FC = () => {
     const level = calculateLevel(goal);
     const isLeaf = !goals.some(g => g.parentId === goal.id);
     
-    // Simple level-based colors
-    const levelColors = ['#e3f2fd', '#fff3e0', '#e8f5e8', '#fce4ec', '#f1f8e9'];
-    const bgColor = levelColors[level % levelColors.length];
+    // Clean white cards by default, green when completed
+    const bgColor = goal.completed 
+      ? '#c8e6c9'  // Green when completed
+      : 'white';   // White by default
     
     return (
       <>
@@ -526,7 +581,8 @@ const SimpleGoalBreaker: React.FC = () => {
               textAlign: 'center',
               overflow: 'hidden', // NO SCROLLBAR
               lineHeight: '1.3',
-              padding: '12px 4px'
+              padding: '12px 4px',
+              textDecoration: goal.completed ? 'line-through' : 'none' // Strikethrough when completed
             }}
           />
         </div>
@@ -544,7 +600,7 @@ const SimpleGoalBreaker: React.FC = () => {
               height: '20px',
               borderRadius: '50%',
               border: '1px solid #999',
-              backgroundColor: levelColors[(level + 1) % levelColors.length], // Next level color
+              backgroundColor: 'white', // White like cards
               fontSize: '14px',
               cursor: 'pointer',
               padding: 0,
@@ -572,7 +628,7 @@ const SimpleGoalBreaker: React.FC = () => {
               height: '20px',
               borderRadius: '50%',
               border: '1px solid #999',
-              backgroundColor: levelColors[level % levelColors.length], // Same level color
+              backgroundColor: 'white', // White like cards
               fontSize: '14px',
               cursor: 'pointer',
               padding: 0,

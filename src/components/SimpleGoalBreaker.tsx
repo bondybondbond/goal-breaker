@@ -20,12 +20,47 @@ const SimpleGoalBreaker: React.FC = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
   const [helperText, setHelperText] = useState('');
 
+  // ===== MENU STATE =====
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // ===== CANVAS STATE =====
+  const [currentCanvasId, setCurrentCanvasId] = useState<string>('canvas-1');
+  const [canvasList, setCanvasList] = useState<any[]>([]);
+  const [isRenamingCanvas, setIsRenamingCanvas] = useState(false);
+  const [customCanvasName, setCustomCanvasName] = useState<string>('');
+
   // ===== PANNING STATE =====
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // ===== AUTO-LOAD FROM LOCALSTORAGE ON MOUNT =====
+  useEffect(() => {
+    try {
+      // Load canvas list
+      const storedList = localStorage.getItem('canvasList');
+      const list = storedList ? JSON.parse(storedList) : [];
+      setCanvasList(list);
+      
+      // Load last active canvas ID
+      const lastCanvasId = localStorage.getItem('currentCanvasId') || 'canvas-1';
+      setCurrentCanvasId(lastCanvasId);
+      
+      // Find and load that canvas
+      const canvas = list.find((c: any) => c.id === lastCanvasId);
+      if (canvas) {
+        setGoals(canvas.goals);
+        setNextId(canvas.nextId);
+        console.log('✅ Loaded canvas:', canvas.name);
+      } else {
+        console.log('No saved canvas found, starting fresh');
+      }
+    } catch (error) {
+      console.error('Failed to load from localStorage:', error);
+    }
+  }, []); // Empty dependency array = run once on mount
 
   // Global spacebar detection for panning
   useEffect(() => {
@@ -51,6 +86,44 @@ const SimpleGoalBreaker: React.FC = () => {
       document.removeEventListener('keyup', handleGlobalKeyUp);
     };
   }, []);
+
+  // ===== AUTO-SAVE TO LOCALSTORAGE =====
+  useEffect(() => {
+    // Auto-generate canvas name from main goal (first 20 chars)
+    const mainGoal = goals.find(g => !g.parentId);
+    const canvasName = mainGoal ? mainGoal.text.substring(0, 20) : 'Untitled Canvas';
+    
+    try {
+      // Load existing canvas list
+      const stored = localStorage.getItem('canvasList');
+      let list = stored ? JSON.parse(stored) : [];
+      
+      // Update or add current canvas
+      const canvasIndex = list.findIndex((c: any) => c.id === currentCanvasId);
+      const canvasData = {
+        id: currentCanvasId,
+        name: canvasName,
+        goals,
+        nextId,
+        lastSaved: new Date().toISOString()
+      };
+      
+      if (canvasIndex >= 0) {
+        list[canvasIndex] = canvasData;
+      } else {
+        list.push(canvasData);
+      }
+      
+      // Save updated list
+      localStorage.setItem('canvasList', JSON.stringify(list));
+      localStorage.setItem('currentCanvasId', currentCanvasId);
+      
+      // Update local canvas list state
+      setCanvasList(list);
+    } catch (error) {
+      console.error('Failed to save to localStorage:', error);
+    }
+  }, [goals, nextId, currentCanvasId]);
 
   // Helper text based on selection
   useEffect(() => {
@@ -434,41 +507,13 @@ const SimpleGoalBreaker: React.FC = () => {
       <div
         style={{
           position: 'absolute',
-          left: goal.position.x + 160 - 69, // Right-align: card width (160px) - buttons (23*3=69px)
+          left: goal.position.x + 160 - 46, // Right-align: card width (160px) - buttons (23*2=46px)
           top: goal.position.y - 26, // Just above card
           display: 'flex',
           gap: '0', // No gap - buttons touch
           zIndex: 1000 // On top of everything
         }}
       >
-        {/* Priority button (placeholder for now) */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            // TODO: Priority functionality
-          }}
-          style={{
-            width: '23px',
-            height: '23px',
-            border: '1px solid #ddd',
-            backgroundColor: 'white',
-            borderRadius: '0',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0
-          }}
-          title="Set priority"
-        >
-          <div style={{
-            width: 0,
-            height: 0,
-            borderLeft: '5px solid transparent',
-            borderRight: '5px solid transparent',
-            borderBottom: '7px solid #4A90E2'
-          }} />
-        </button>
 
         {/* Complete button */}
         <button
@@ -678,10 +723,263 @@ const SimpleGoalBreaker: React.FC = () => {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2 style={{ outline: 'none', userSelect: 'none' }}>🎯 Goal Breaker</h2>
+      {/* Header with menu button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          style={{
+            width: '40px',
+            height: '40px',
+            border: '1px solid #ccc',
+            backgroundColor: 'white',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px'
+          }}
+          title="Canvas Menu"
+        >
+          ☰
+        </button>
+        <h2 style={{ outline: 'none', userSelect: 'none', margin: 0 }}>🎯 Goal Breaker</h2>
+      </div>
 
-      
+      {/* Canvas Menu Overlay */}
+      {isMenuOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '80px',
+            left: 0,
+            width: '300px',
+            height: 'calc(100vh - 80px)',
+            backgroundColor: 'white',
+            boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
+            zIndex: 10000,
+            padding: '20px',
+            overflowY: 'auto'
+          }}
+        >
+          {/* Close button */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ margin: 0 }}>My Canvases</h3>
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              style={{
+                width: '30px',
+                height: '30px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                fontSize: '20px'
+              }}
+            >
+              ✕
+            </button>
+          </div>
 
+          {/* New Canvas Button */}
+          <button
+            onClick={() => {
+              // Auto-save will handle saving current canvas before we switch
+              const newCanvasId = `canvas-${Date.now()}`;
+              const newGoals = [
+                { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
+              ];
+              
+              setCurrentCanvasId(newCanvasId);
+              setGoals(newGoals);
+              setNextId(2);
+              setIsMenuOpen(false);
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#4A90E2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginBottom: '20px'
+            }}
+          >
+            + New Canvas
+          </button>
+
+          {/* Current Canvas */}
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: '#f0f0f0',
+              borderRadius: '4px',
+              marginBottom: '10px',
+              border: '2px solid #4A90E2'
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+              {isRenamingCanvas ? (
+                <input
+                  type="text"
+                  value={customCanvasName}
+                  onChange={(e) => setCustomCanvasName(e.target.value)}
+                  onBlur={() => {
+                    // Save the custom name
+                    if (customCanvasName.trim()) {
+                      const updatedList = canvasList.map((c: any) => 
+                        c.id === currentCanvasId ? { ...c, customName: customCanvasName.trim() } : c
+                      );
+                      localStorage.setItem('canvasList', JSON.stringify(updatedList));
+                      setCanvasList(updatedList);
+                    }
+                    setIsRenamingCanvas(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    } else if (e.key === 'Escape') {
+                      setIsRenamingCanvas(false);
+                    }
+                  }}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: '4px 8px',
+                    border: '1px solid #4A90E2',
+                    borderRadius: '2px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              ) : (
+                <>
+                  <span>{(() => {
+                    const currentCanvas = canvasList.find((c: any) => c.id === currentCanvasId);
+                    if (currentCanvas?.customName) {
+                      return currentCanvas.customName;
+                    }
+                    const mainGoal = goals.find(g => !g.parentId);
+                    return mainGoal ? mainGoal.text.substring(0, 20) + (mainGoal.text.length > 20 ? '...' : '') : 'Untitled Canvas';
+                  })()}</span>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                    <button
+                      onClick={() => {
+                        const currentCanvas = canvasList.find((c: any) => c.id === currentCanvasId);
+                        const currentName = currentCanvas?.customName || (() => {
+                          const mainGoal = goals.find(g => !g.parentId);
+                          return mainGoal ? mainGoal.text.substring(0, 20) : 'Untitled Canvas';
+                        })();
+                        setCustomCanvasName(currentName);
+                        setIsRenamingCanvas(true);
+                      }}
+                  style={{
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    padding: '2px 6px'
+                  }}
+                  title="Rename canvas"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Delete this canvas? This cannot be undone.')) {
+                      // Remove canvas from list
+                      const updatedList = canvasList.filter((c: any) => c.id !== currentCanvasId);
+                      localStorage.setItem('canvasList', JSON.stringify(updatedList));
+                      setCanvasList(updatedList);
+                      
+                      // Switch to another canvas or create new one
+                      if (updatedList.length > 0) {
+                        const nextCanvas = updatedList[0];
+                        setCurrentCanvasId(nextCanvas.id);
+                        setGoals(nextCanvas.goals);
+                        setNextId(nextCanvas.nextId);
+                      } else {
+                        // No canvases left, create a fresh one
+                        const newCanvasId = `canvas-${Date.now()}`;
+                        const newGoals = [
+                          { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
+                        ];
+                        setCurrentCanvasId(newCanvasId);
+                        setGoals(newGoals);
+                        setNextId(2);
+                      }
+                      
+                      setIsMenuOpen(false);
+                    }
+                  }}
+                  style={{
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    padding: '2px 6px',
+                    color: '#e74c3c'
+                  }}
+                  title="Delete this canvas"
+                >
+                  🗑️
+                </button>
+              </div>
+                </>
+              )}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {goals.length} goal{goals.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid #ddd', margin: '20px 0' }}></div>
+
+          {/* All Saved Canvases */}
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>All Canvases</h4>
+          {canvasList
+            .filter((c: any) => c.id !== currentCanvasId)
+            .map((canvas: any) => (
+              <div
+                key={canvas.id}
+                onClick={() => {
+                  // Switch to this canvas
+                  setCurrentCanvasId(canvas.id);
+                  setGoals(canvas.goals);
+                  setNextId(canvas.nextId);
+                  setIsMenuOpen(false);
+                }}
+                style={{
+                  padding: '12px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9f9f9'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+              >
+                <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>
+                  {canvas.name}
+                </div>
+                <div style={{ fontSize: '11px', color: '#999' }}>
+                  {canvas.goals.length} goal{canvas.goals.length !== 1 ? 's' : ''} • 
+                  {new Date(canvas.lastSaved).toLocaleDateString()}
+                </div>
+              </div>
+            ))}
+          
+          {canvasList.filter((c: any) => c.id !== currentCanvasId).length === 0 && (
+            <p style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>
+              No other canvases yet. Click "+ New Canvas" to create one.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Canvas area with positioned goals - WITH PANNING */}
       <div 

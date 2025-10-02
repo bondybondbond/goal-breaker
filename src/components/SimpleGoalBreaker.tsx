@@ -8,11 +8,12 @@ interface SimpleGoal {
   parentId?: number;
   position: { x: number; y: number };
   completed?: boolean; // Track completion state
+  isPlaceholder?: boolean; // Track if text is placeholder
 }
 
 const SimpleGoalBreaker: React.FC = () => {
   const [goals, setGoals] = useState<SimpleGoal[]>([
-    { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
+    { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 }, isPlaceholder: true }
   ]);
   const [nextId, setNextId] = useState(2);
   
@@ -391,7 +392,8 @@ const SimpleGoalBreaker: React.FC = () => {
       id: nextId,
       text: 'New sub-goal',
       parentId: parentId,
-      position: calculateGridPosition(parentId)
+      position: calculateGridPosition(parentId),
+      isPlaceholder: true // Mark as placeholder
     };
     
     setGoals(prev => {
@@ -411,7 +413,8 @@ const SimpleGoalBreaker: React.FC = () => {
       id: nextId,
       text: 'New sibling goal',
       parentId: sibling.parentId,
-      position: calculateGridPosition(sibling.parentId)
+      position: calculateGridPosition(sibling.parentId),
+      isPlaceholder: true // Mark as placeholder
     };
     
     setGoals(prev => {
@@ -613,7 +616,34 @@ const SimpleGoalBreaker: React.FC = () => {
         >
           <textarea
             value={goal.text}
-            onChange={(e) => updateGoalText(goal.id, e.target.value)}
+            onChange={(e) => {
+              const newText = e.target.value;
+              setGoals(prev => prev.map(g => 
+                g.id === goal.id 
+                  ? { ...g, text: newText, isPlaceholder: false } // Clear placeholder flag when typing
+                  : g
+              ));
+            }}
+            onFocus={(e) => {
+              // Clear placeholder text on first focus
+              if (goal.isPlaceholder) {
+                e.target.select(); // Select all text so it gets replaced when typing
+              }
+            }}
+            onBlur={() => {
+              // Restore placeholder if left empty
+              if (goal.text.trim() === '') {
+                setGoals(prev => prev.map(g => 
+                  g.id === goal.id 
+                    ? { 
+                        ...g, 
+                        text: !g.parentId ? 'What\'s your main goal?' : 'New sub-goal',
+                        isPlaceholder: true 
+                      }
+                    : g
+                ));
+              }
+            }}
             style={{ 
               border: 'none', 
               outline: 'none', 
@@ -623,11 +653,13 @@ const SimpleGoalBreaker: React.FC = () => {
               backgroundColor: 'transparent',
               fontSize: `${calculateFontSize(goal.text)}px`, // DYNAMIC font size (PPT-style)
               fontFamily: 'inherit',
+              fontWeight: !goal.parentId ? 'bold' : 'normal', // BOLD for main goal only
               textAlign: 'center',
               overflow: 'hidden', // NO SCROLLBAR
               lineHeight: '1.3',
               padding: '12px 4px',
-              textDecoration: goal.completed ? 'line-through' : 'none' // Strikethrough when completed
+              textDecoration: goal.completed ? 'line-through' : 'none', // Strikethrough when completed
+              color: goal.isPlaceholder ? '#999' : 'inherit' // Gray color for placeholder
             }}
           />
         </div>
@@ -743,7 +775,10 @@ const SimpleGoalBreaker: React.FC = () => {
         >
           ☰
         </button>
-        <h2 style={{ outline: 'none', userSelect: 'none', margin: 0 }}>🎯 Goal Breaker</h2>
+        <h2 style={{ outline: 'none', userSelect: 'none', margin: 0, fontFamily: '"Segoe UI Black", "Arial Black", sans-serif', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '26px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontStyle: 'normal' }}>🎯</span>
+          <span style={{ fontStyle: 'italic' }}>GOAL BREAKER</span>
+        </h2>
       </div>
 
       {/* Canvas Menu Overlay */}
@@ -786,7 +821,7 @@ const SimpleGoalBreaker: React.FC = () => {
               // Auto-save will handle saving current canvas before we switch
               const newCanvasId = `canvas-${Date.now()}`;
               const newGoals = [
-                { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
+                { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 }, isPlaceholder: true }
               ];
               
               setCurrentCanvasId(newCanvasId);
@@ -903,7 +938,7 @@ const SimpleGoalBreaker: React.FC = () => {
                         // No canvases left, create a fresh one
                         const newCanvasId = `canvas-${Date.now()}`;
                         const newGoals = [
-                          { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 } }
+                          { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 }, isPlaceholder: true }
                         ];
                         setCurrentCanvasId(newCanvasId);
                         setGoals(newGoals);

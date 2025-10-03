@@ -57,8 +57,46 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
       </defs>
 
 {connections.map(conn => {
-        // Generate simple straight line path
-        const pathData = `M ${conn.from.x} ${conn.from.y} L ${conn.to.x} ${conn.to.y}`;
+        // Generate path based on layout type
+        let pathData: string;
+        const CARD_WIDTH = 160;
+        const CARD_HEIGHT = 75;
+        
+        if (conn.layoutType === 'vertical') {
+          // VERTICAL LAYOUT: PPT-style trunk with horizontal branches
+          // Vertical trunk from parent → horizontal branches to each child
+          const parentBottomX = conn.from.x - 65; // Bottom edge, optimal left offset
+          const parentBottomY = conn.from.y; // Parent's bottom edge
+          const childLeftX = conn.to.x - CARD_WIDTH / 2; // Child's left edge
+          const childMidY = conn.to.y + CARD_HEIGHT / 2; // Child's vertical middle
+          const trunkX = parentBottomX; // Vertical trunk line position (fixed X)
+          
+          // Path: DOWN from parent → RIGHT to child's left middle
+          pathData = `
+            M ${parentBottomX} ${parentBottomY}
+            L ${trunkX} ${childMidY}
+            L ${childLeftX} ${childMidY}
+          `;
+        } else {
+          // HORIZONTAL LAYOUT: Simple straight down from BOTTOM CENTER (normal spread)
+          // Start from parent's bottom center → straight down to child top center
+          const parentBottomCenterX = conn.from.x; // Bottom center
+          const parentBottomY = conn.from.y; // Parent's bottom edge
+          
+          // Path: straight down (add small jog if not vertically aligned)
+          if (Math.abs(parentBottomCenterX - conn.to.x) < 5) {
+            // Nearly vertical - straight line
+            pathData = `M ${parentBottomCenterX} ${parentBottomY} L ${conn.to.x} ${conn.to.y}`;
+          } else {
+            // Add 90° jog: down → across → down
+            pathData = `
+              M ${parentBottomCenterX} ${parentBottomY}
+              L ${parentBottomCenterX} ${(parentBottomY + conn.to.y) / 2}
+              L ${conn.to.x} ${(parentBottomY + conn.to.y) / 2}
+              L ${conn.to.x} ${conn.to.y}
+            `;
+          }
+        }
         
         return (
           <g key={conn.id}>
@@ -72,14 +110,24 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
               markerEnd={conn.type !== 'placeholder' ? `url(#${conn.completed ? markerCompletedId : markerId})` : undefined}
             />
             
-            {/* Connection point on parent (start) - minimal */}
-            <circle
-              cx={conn.from.x}
-              cy={conn.from.y}
-              r="2"
-              fill={conn.completed ? "#10b981" : "#000000"}
-              className="transition-all duration-200"
-            />
+            {/* Connection point on parent (start) */}
+            {conn.layoutType === 'vertical' ? (
+              <circle
+                cx={conn.from.x - 65} // Bottom edge, optimal left offset
+                cy={conn.from.y} // Parent's bottom
+                r="2"
+                fill={conn.completed ? "#10b981" : "#000000"}
+                className="transition-all duration-200"
+              />
+            ) : (
+              <circle
+                cx={conn.from.x} // Parent's BOTTOM CENTER
+                cy={conn.from.y} // Parent's bottom edge
+                r="2"
+                fill={conn.completed ? "#10b981" : "#000000"}
+                className="transition-all duration-200"
+              />
+            )}
             
             {/* Different rendering for placeholder vs normal connections */}
             {conn.type === 'placeholder' ? (
@@ -106,10 +154,10 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
                 </text>
               </g>
             ) : (
-              /* Normal connection point on child (end) - minimal */
+              /* Normal connection point on child (end) */
               <circle
-                cx={conn.to.x}
-                cy={conn.to.y}
+                cx={conn.layoutType === 'vertical' ? conn.to.x - 80 : conn.to.x} // Left middle for vertical, top center for horizontal
+                cy={conn.layoutType === 'vertical' ? conn.to.y + 37.5 : conn.to.y} // Vertical middle for vertical, top for horizontal
                 r="2"
                 fill={conn.completed ? "#10b981" : "#000000"}
                 className="transition-all duration-200"

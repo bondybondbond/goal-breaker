@@ -337,11 +337,12 @@ const SimpleGoalBreaker: React.FC = () => {
           currentX += childWidth + HORIZONTAL_GAP;
         });
       } else {
-        // Vertical layout
+        // Vertical layout - indent children to the right (PPT style)
+        const indent = 35; // Pixels to indent children to show hierarchy
         let currentY = y + CARD_HEIGHT + VERTICAL_GAP;
         
         children.forEach(child => {
-          positionNode(child.id, x, currentY);
+          positionNode(child.id, x + indent, currentY);
           currentY += CARD_HEIGHT + VERTICAL_GAP;
         });
       }
@@ -733,6 +734,16 @@ const SimpleGoalBreaker: React.FC = () => {
       if (goal.parentId) {
         const parent = goals.find(g => g.id === goal.parentId);
         if (parent) {
+          // Determine if parent uses vertical layout (all children are leaves)
+          const parentChildren = goals.filter(g => g.parentId === parent.id);
+          const allChildrenAreLeaves = parentChildren.every(child => 
+            !goals.some(g => g.parentId === child.id)
+          );
+          const isLevel1 = !parent.parentId; // Main goal's children
+          
+          // Vertical layout ONLY if: NOT level 1 AND all children are leaves
+          const useVerticalLayout = !isLevel1 && allChildrenAreLeaves;
+          
           connections.push({
             id: `${parent.id}-${goal.id}`,
             from: {
@@ -744,7 +755,8 @@ const SimpleGoalBreaker: React.FC = () => {
               y: goal.position.y
             },
             completed: false,
-            path: ''
+            path: '',
+            layoutType: useVerticalLayout ? 'vertical' : 'horizontal'
           });
         }
       }

@@ -110,24 +110,6 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
               markerEnd={conn.type !== 'placeholder' ? `url(#${conn.completed ? markerCompletedId : markerId})` : undefined}
             />
             
-            {/* Connection point on parent (start) */}
-            {conn.layoutType === 'vertical' ? (
-              <circle
-                cx={conn.from.x - 65} // Bottom edge, optimal left offset
-                cy={conn.from.y} // Parent's bottom
-                r="2"
-                fill={conn.completed ? "#10b981" : "#000000"}
-                className="transition-all duration-200"
-              />
-            ) : (
-              <circle
-                cx={conn.from.x} // Parent's BOTTOM CENTER
-                cy={conn.from.y} // Parent's bottom edge
-                r="2"
-                fill={conn.completed ? "#10b981" : "#000000"}
-                className="transition-all duration-200"
-              />
-            )}
             
             {/* Different rendering for placeholder vs normal connections */}
             {conn.type === 'placeholder' ? (
@@ -153,16 +135,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ connections, c
                   {conn.hiddenCount}
                 </text>
               </g>
-            ) : (
-              /* Normal connection point on child (end) */
-              <circle
-                cx={conn.layoutType === 'vertical' ? conn.to.x - 80 : conn.to.x} // Left middle for vertical, top center for horizontal
-                cy={conn.layoutType === 'vertical' ? conn.to.y + 37.5 : conn.to.y} // Vertical middle for vertical, top for horizontal
-                r="2"
-                fill={conn.completed ? "#10b981" : "#000000"}
-                className="transition-all duration-200"
-              />
-            )}
+            ) : null}
           </g>
         );
       })}

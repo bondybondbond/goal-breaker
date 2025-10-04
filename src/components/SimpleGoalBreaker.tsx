@@ -13,13 +13,14 @@ interface SimpleGoal {
 
 const SimpleGoalBreaker: React.FC = () => {
   const [goals, setGoals] = useState<SimpleGoal[]>([
-    { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 }, isPlaceholder: true }
+    { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 600, y: 80 }, isPlaceholder: true }
   ]);
   const [nextId, setNextId] = useState(2);
   
   // ===== SELECTION STATE =====
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
   const [helperText, setHelperText] = useState('');
+  const [showPanningTip, setShowPanningTip] = useState(false);
 
   // ===== MENU STATE =====
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -503,6 +504,19 @@ const SimpleGoalBreaker: React.FC = () => {
     return 10; // Very long text = minimum readable size
   };
 
+  // Calculate vertical padding to center single-line text
+  const calculateTextareaPadding = (text: string): string => {
+    const charCount = text.length;
+    
+    // If text is short (< 16 chars = single line), center it vertically with more top padding
+    if (charCount < 16) {
+      return '20px 4px 12px 4px'; // More top padding to center single line
+    }
+    
+    // For 16+ characters (multi-line text), use balanced padding
+    return '12px 4px'; // Normal padding for multi-line
+  };
+
   // Render toolbar above selected card
   const renderToolbar = (goal: SimpleGoal) => {
     if (selectedGoalId !== goal.id) return null;
@@ -658,7 +672,7 @@ const SimpleGoalBreaker: React.FC = () => {
               textAlign: 'center',
               overflow: 'hidden', // NO SCROLLBAR
               lineHeight: '1.3',
-              padding: '12px 4px',
+              padding: calculateTextareaPadding(goal.text), // DYNAMIC padding for vertical centering
               textDecoration: goal.completed ? 'line-through' : 'none', // Strikethrough when completed
               color: goal.isPlaceholder ? '#999' : 'inherit' // Gray color for placeholder
             }}
@@ -833,7 +847,7 @@ const SimpleGoalBreaker: React.FC = () => {
               // Auto-save will handle saving current canvas before we switch
               const newCanvasId = `canvas-${Date.now()}`;
               const newGoals = [
-                { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 }, isPlaceholder: true }
+                { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 600, y: 80 }, isPlaceholder: true }
               ];
               
               setCurrentCanvasId(newCanvasId);
@@ -950,7 +964,7 @@ const SimpleGoalBreaker: React.FC = () => {
                         // No canvases left, create a fresh one
                         const newCanvasId = `canvas-${Date.now()}`;
                         const newGoals = [
-                          { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 400, y: 80 }, isPlaceholder: true }
+                          { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 600, y: 80 }, isPlaceholder: true }
                         ];
                         setCurrentCanvasId(newCanvasId);
                         setGoals(newGoals);
@@ -1069,6 +1083,70 @@ const SimpleGoalBreaker: React.FC = () => {
             renderToolbar(goals.find(g => g.id === selectedGoalId)!)
           }
         </div>
+      </div>
+
+      {/* Lightbulb Tip Button - Top Right */}
+      <div style={{
+        position: 'fixed',
+        top: '75px',
+        right: '24px',
+        zIndex: 1000
+      }}>
+        <button
+          onClick={() => setShowPanningTip(!showPanningTip)}
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: '#D9D9D9',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+          title="Panning tip"
+        >
+          💡
+        </button>
+        
+        {showPanningTip && (
+          <div style={{
+            position: 'absolute',
+            top: '50px',
+            right: '0',
+            backgroundColor: '#FFF9C4',
+            color: 'black',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            fontSize: '13px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+            width: '320px',
+            border: '2px solid #F59E0B',
+            whiteSpace: 'normal',
+            lineHeight: '1.4'
+          }}>
+            <strong>Did you know that...</strong>
+            <br />
+            Pan around the board by <kbd style={{
+              padding: '2px 6px',
+              backgroundColor: 'white',
+              borderRadius: '3px',
+              border: '1px solid #9CA3AF',
+              fontSize: '11px',
+              fontWeight: '600'
+            }}>Space</kbd> or <kbd style={{
+              padding: '2px 6px',
+              backgroundColor: 'white',
+              borderRadius: '3px',
+              border: '1px solid #9CA3AF',
+              fontSize: '11px',
+              fontWeight: '600'
+            }}>middle mouse</kbd> button hold and drag?
+          </div>
+        )}
       </div>
 
       {/* Helper Text - Bottom Center */}

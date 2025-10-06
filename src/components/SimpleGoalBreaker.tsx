@@ -11,9 +11,20 @@ interface SimpleGoal {
   isPlaceholder?: boolean; // Track if text is placeholder
 }
 
-const SimpleGoalBreaker: React.FC = () => {
+interface SimpleGoalBreakerProps {
+  initialGoal?: string;
+  useAI?: boolean;
+}
+
+const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useAI }) => {
   const [goals, setGoals] = useState<SimpleGoal[]>([
-    { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 600, y: 80 }, isPlaceholder: true }
+    { 
+      id: 1, 
+      text: initialGoal || 'What\'s your main goal?', 
+      parentId: undefined, 
+      position: { x: 600, y: 80 }, 
+      isPlaceholder: !initialGoal 
+    }
   ]);
   const [nextId, setNextId] = useState(2);
   
@@ -40,6 +51,12 @@ const SimpleGoalBreaker: React.FC = () => {
 
   // ===== AUTO-LOAD FROM LOCALSTORAGE ON MOUNT =====
   useEffect(() => {
+    // If we have an initialGoal, we're starting fresh - don't load old canvas
+    if (initialGoal) {
+      console.log('🆕 Starting new board with goal:', initialGoal);
+      return;
+    }
+
     try {
       // Load canvas list
       const storedList = localStorage.getItem('canvasList');
@@ -809,12 +826,27 @@ const SimpleGoalBreaker: React.FC = () => {
 
       {/* Canvas Menu Overlay */}
       {isMenuOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '80px',
-            left: 0,
-            width: '300px',
+        <>
+          {/* Backdrop - dark overlay */}
+          <div
+            onClick={() => setIsMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              top: '80px',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              zIndex: 9999
+            }}
+          />
+          {/* Menu Panel */}
+          <div
+            style={{
+              position: 'fixed',
+              top: '80px',
+              left: 0,
+              width: '300px',
             height: 'calc(100vh - 80px)',
             backgroundColor: 'white',
             boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
@@ -1040,6 +1072,7 @@ const SimpleGoalBreaker: React.FC = () => {
             </p>
           )}
         </div>
+        </>
       )}
 
       {/* Canvas area with positioned goals - WITH PANNING */}
@@ -1203,6 +1236,30 @@ const SimpleGoalBreaker: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* AI Assist Button - Bottom Right */}
+      <button
+        onClick={() => console.log('AI button clicked!')}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '56px',
+          height: '56px',
+          backgroundColor: '#D9D9D9',
+          border: 'none',
+          borderRadius: '50%',
+          fontSize: '28px',
+          cursor: 'pointer',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        title="AI Assist - Get smart suggestions"
+      >
+        💡
+      </button>
     </div>
   );
 };

@@ -11,6 +11,7 @@ node_modules/
 
 # Misc
 .DS_Store
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -44,3 +45,4 @@ docs/*_DEBUG.md
 
 # Personal Development Notes (Optional - Remove if You Want to Track These)
 # docs/DEVELOPMENT_LOG.md
+docs/SESSION_LOG_*.md 

@@ -39,24 +39,9 @@ const GoalCard: React.FC<GoalCardProps> = ({
   const calculateFontSize = (text: string): number => {
     const charCount = text.length;
     
-    if (charCount < 30) return 16; // Short text = large font
-    if (charCount < 60) return 14; // Medium text
-    if (charCount < 100) return 12; // Longer text
-    if (charCount < 150) return 11; // Much longer
-    return 10; // Very long text = minimum readable size
-  };
-
-  // Calculate vertical padding to center single-line text
-  const calculateTextareaPadding = (text: string): string => {
-    const charCount = text.length;
-    
-    // If text is short (< 16 chars = single line), center it vertically with more top padding
-    if (charCount < 16) {
-      return '20px 4px 12px 4px'; // More top padding to center single line
-    }
-    
-    // For 16+ characters (multi-line text), use balanced padding
-    return '12px 4px'; // Normal padding for multi-line
+    if (charCount < 25) return 16; // Short text = large font
+    if (charCount < 50) return 14; // Medium text
+    return 13; // Longer text = minimum readable size // 42 chars + "..." = 45 total
   };
 
   const level = calculateLevel(goal);
@@ -92,7 +77,10 @@ const GoalCard: React.FC<GoalCardProps> = ({
           value={goal.text}
           onChange={(e) => {
             const newText = e.target.value;
-            onTextChange(goal.id, newText);
+            // Limit to 45 characters max
+            if (newText.length <= 45) {
+              onTextChange(goal.id, newText);
+            }
           }}
           onFocus={(e) => {
             // Clear placeholder text on first focus
@@ -109,11 +97,12 @@ const GoalCard: React.FC<GoalCardProps> = ({
               );
             }
           }}
+          title={goal.text} // Show full text on hover
           style={{ 
             border: 'none', 
             outline: 'none', 
             width: '100%',
-            height: '60px',
+            height: '60px', // FIXED height
             resize: 'none',
             backgroundColor: 'transparent',
             fontSize: `${calculateFontSize(goal.text)}px`, // DYNAMIC font size (PPT-style)
@@ -122,7 +111,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
             textAlign: 'center',
             overflow: 'hidden', // NO SCROLLBAR
             lineHeight: '1.3',
-            padding: calculateTextareaPadding(goal.text), // DYNAMIC padding for vertical centering
+            padding: '12px 4px', // Fixed padding
             textDecoration: goal.completed ? 'line-through' : 'none', // Strikethrough when completed
             color: goal.isPlaceholder ? '#999' : 'inherit' // Gray color for placeholder
           }}
@@ -136,7 +125,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
           style={{
             position: 'absolute',
             left: goal.position.x + 70, // Center below card
-            top: goal.position.y + 85, // 10px gap below card
+            top: goal.position.y + 75, // Fixed position below card
             width: '20px',
             height: '20px',
             borderRadius: '50%',
@@ -163,7 +152,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
           style={{
             position: 'absolute',
             left: goal.position.x + 165, // Right of card with smaller gap
-            top: goal.position.y + 28, // Vertically centered
+            top: goal.position.y + 28, // Fixed vertical center
             width: '20px',
             height: '20px',
             borderRadius: '50%',

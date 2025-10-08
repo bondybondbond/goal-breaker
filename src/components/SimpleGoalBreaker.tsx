@@ -4,6 +4,7 @@ import { Connection } from '../types/goal.types';
 import Toolbar from './Toolbar';
 import CanvasMenu from './CanvasMenu';
 import GoalCard from './GoalCard';
+import { getAISubGoals } from '../utils/groqApi';
 
 interface SimpleGoal {
   id: number;
@@ -35,6 +36,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
   const [helperText, setHelperText] = useState('');
   const [showPanningTip, setShowPanningTip] = useState(false);
+
+  // ===== AI STATE =====
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
   // ===== MENU STATE =====
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -82,6 +87,60 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       console.error('Failed to load from localStorage:', error);
     }
   }, []); // Empty dependency array = run once on mount
+
+  // ===== AUTO-TRIGGER AI ON MOUNT (if useAI=true) =====
+  useEffect(() => {
+    // Only trigger if user clicked "Get ✨ AI help" on start screen
+    if (!useAI || !initialGoal) return;
+    
+    // Wait a moment for UI to render, then auto-generate AI suggestions
+    const timer = setTimeout(async () => {
+      const mainGoal = goals.find(g => !g.parentId);
+      if (!mainGoal) return;
+
+      console.log('🤖 Auto-generating AI suggestions for:', mainGoal.text);
+      setIsLoadingAI(true); // Show loading state
+      
+      try {
+        const suggestions = await getAISubGoals(mainGoal.text);
+        console.log('✅ Auto-generated', suggestions.length, 'suggestions');
+        
+        // Create all AI children at once (batch update for efficiency)
+        const newChildren: SimpleGoal[] = suggestions.map((suggestion, index) => {
+          // Truncate AI text to 45 chars max
+          const text = suggestion.text.length <= 45 
+            ? suggestion.text 
+            : suggestion.text.substring(0, 42) + '...';
+          
+          return {
+            id: nextId + index,
+            text: text,
+            parentId: mainGoal.id,
+            position: calculateGridPosition(mainGoal.id),
+            isPlaceholder: false
+          };
+        });
+        
+        // Add all children and recalculate positions once
+        setGoals(prev => {
+          const updated = [...prev, ...newChildren];
+          return recalculatePositions(updated);
+        });
+        
+        // Update nextId to account for all new goals
+        setNextId(prev => prev + suggestions.length);
+        
+        console.log('🎉 AI breakdown complete!');
+      } catch (error) {
+        console.error('❌ Auto-AI failed:', error);
+        alert('Failed to generate AI suggestions. Please try the ✨ button manually.');
+      } finally {
+        setIsLoadingAI(false);
+      }
+    }, 800); // Small delay to let canvas render first
+
+    return () => clearTimeout(timer);
+  }, [useAI, initialGoal]); // Run when component mounts with useAI
 
   // Global spacebar detection for panning
   useEffect(() => {
@@ -219,6 +278,33 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
 
   const handleCanvasClick = () => {
     setSelectedGoalId(null); // Deselect when clicking canvas
+  };
+
+  // ===== AI SUGGESTIONS HANDLER =====
+  const handleGetAISuggestions = async () => {
+    if (!selectedGoalId) return;
+    
+    const selectedGoal = goals.find(g => g.id === selectedGoalId);
+    if (!selectedGoal) return;
+
+    console.log('💡 Getting AI suggestions for:', selectedGoal.text);
+    setIsLoadingAI(true);
+    setAiSuggestions([]); // Clear previous suggestions
+    
+    try {
+      const suggestions = await getAISubGoals(selectedGoal.text);
+      console.log('✅ Got', suggestions.length, 'suggestions');
+      
+      // Extract just the text from suggestions
+      const suggestionTexts = suggestions.map(s => s.text);
+      setAiSuggestions(suggestionTexts);
+      
+    } catch (error) {
+      console.error('❌ Failed to get AI suggestions:', error);
+      alert('Failed to get AI suggestions. Check console for details.');
+    } finally {
+      setIsLoadingAI(false);
+    }
   };
 
   // ===== PANNING EVENT HANDLERS =====
@@ -425,6 +511,31 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     setNextId(prev => prev + 1);
   };
 
+  // Truncate text to 45 chars max (3 lines × 15 chars)
+  const truncateText = (text: string): string => {
+    if (text.length <= 45) return text;
+    return text.substring(0, 42) + '...'; // 42 chars + "..." = 45 total
+  };
+
+  // Add a child with custom text (for AI suggestions)
+  const addChildWithText = (parentId: number, text: string) => {
+    const truncatedText = truncateText(text); // Truncate long AI text
+    
+    const newGoal: SimpleGoal = {
+      id: nextId,
+      text: truncatedText,
+      parentId: parentId,
+      position: calculateGridPosition(parentId),
+      isPlaceholder: false // Not a placeholder - real AI text
+    };
+    
+    setGoals(prev => {
+      const updated = [...prev, newGoal];
+      return recalculatePositions(updated);
+    });
+    setNextId(prev => prev + 1);
+  };
+
   // Add a sibling to a specific goal
   const addSibling = (siblingId: number) => {
     const sibling = goals.find(g => g.id === siblingId);
@@ -626,6 +737,7 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
         >
           ☰
         </button>
+
         <h2 style={{ outline: 'none', userSelect: 'none', margin: 0, fontFamily: '"Segoe UI Black", "Arial Black", sans-serif', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '26px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontStyle: 'normal' }}>🎯</span>
           <span style={{ fontStyle: 'italic' }}>GOAL BREAKER</span>
@@ -769,6 +881,107 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       </div>
 
       {/* Helper Text - Bottom Center */}
+      {/* AI Suggestions Panel */}
+      {aiSuggestions.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          backgroundColor: 'white',
+          padding: '16px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          maxWidth: '600px',
+          minWidth: '400px'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '12px'
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}>
+              ✨ AI Suggestions
+            </h3>
+            <button
+              onClick={() => setAiSuggestions([])}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '20px',
+                cursor: 'pointer',
+                padding: '0 4px'
+              }}
+              title="Close suggestions"
+            >
+              ×
+            </button>
+          </div>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '8px' 
+          }}>
+            {aiSuggestions.map((suggestion, index) => (
+              <div
+                key={index}
+                onClick={() => {
+                  if (selectedGoalId) {
+                    console.log('Adding AI suggestion as child:', suggestion);
+                    addChildWithText(selectedGoalId, suggestion);
+                    // Remove this suggestion from the list
+                    setAiSuggestions(prev => prev.filter((_, i) => i !== index));
+                  }
+                }}
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid #e5e7eb',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#8b5cf6';
+                  e.currentTarget.style.color = 'white';
+                  e.currentTarget.style.borderColor = '#8b5cf6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.color = 'black';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', opacity: 0.6, marginTop: '2px' }}>
+                    {index + 1}.
+                  </span>
+                  <span style={{ flex: 1, fontSize: '14px' }}>
+                    {suggestion}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div style={{ 
+            marginTop: '12px', 
+            fontSize: '12px', 
+            color: '#6b7280',
+            textAlign: 'center'
+          }}>
+            Click a suggestion to add it as a sub-goal
+          </div>
+        </div>
+      )}
+
       {helperText && (
         <div style={{
           position: 'fixed',
@@ -824,28 +1037,33 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       )}
 
       {/* AI Assist Button - Bottom Right */}
-      <button
-        onClick={() => console.log('AI button clicked!')}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '56px',
-          height: '56px',
-          backgroundColor: '#D9D9D9',
-          border: 'none',
-          borderRadius: '50%',
-          fontSize: '28px',
-          cursor: 'pointer',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-        title="AI Assist - Get smart suggestions"
-      >
-        💡
-      </button>
+      {selectedGoalId && (
+        <button
+          onClick={handleGetAISuggestions}
+          disabled={isLoadingAI}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            width: '56px',
+            height: '56px',
+            backgroundColor: isLoadingAI ? '#9CA3AF' : '#8b5cf6',
+            border: 'none',
+            borderRadius: '50%',
+            fontSize: '28px',
+            cursor: isLoadingAI ? 'wait' : 'pointer',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}
+          title={isLoadingAI ? 'AI is thinking...' : 'Get AI suggestions for this goal'}
+        >
+          {isLoadingAI ? '⏳' : '✨'}
+        </button>
+      )}
     </div>
   );
 };

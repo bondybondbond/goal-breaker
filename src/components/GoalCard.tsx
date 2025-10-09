@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 interface SimpleGoal {
   id: number;
@@ -28,6 +28,15 @@ const GoalCard: React.FC<GoalCardProps> = ({
   onAddChild,
   onAddSibling
 }) => {
+  const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Update content only when goal changes (not during typing)
+  useEffect(() => {
+    if (contentRef.current && contentRef.current.textContent !== goal.text) {
+      contentRef.current.textContent = goal.text;
+    }
+  }, [goal.id, goal.text]); // Update when goal changes or text changes externally
+  
   // Calculate goal level for styling
   const calculateLevel = (g: SimpleGoal): number => {
     if (!g.parentId) return 0;
@@ -35,17 +44,29 @@ const GoalCard: React.FC<GoalCardProps> = ({
     return parent ? calculateLevel(parent) + 1 : 0;
   };
 
-  // Calculate dynamic font size based on text content (PowerPoint style)
-  const calculateFontSize = (text: string): number => {
+  // Font sizing based on actual line capacity (16px font = 15 chars per line)
+  const calculateFontSize = (text: string): { fontSize: number; topPadding: string } => {
     const charCount = text.length;
     
-    if (charCount < 25) return 16; // Short text = large font
-    if (charCount < 50) return 14; // Medium text
-    return 13; // Longer text = minimum readable size // 42 chars + "..." = 45 total
+    // 1 sentence (≤15 chars): Keep size 16, middle align
+    if (charCount <= 15) {
+      return { fontSize: 16, topPadding: '20px' };
+    }
+    
+    // 2 sentences (16-30 chars): Keep size 16, move slightly up
+    if (charCount <= 30) {
+      return { fontSize: 16, topPadding: '12px' };
+    }
+    
+    // 3+ sentences (31+ chars): Top align, shrink font
+    return { fontSize: 13, topPadding: '4px' };
   };
 
   const level = calculateLevel(goal);
   const isSelected = selectedGoalId === goal.id;
+  
+  // Calculate font size and top padding
+  const { fontSize, topPadding } = calculateFontSize(goal.text);
   
   // Clean white cards by default, green when completed
   const bgColor = goal.completed 
@@ -73,29 +94,42 @@ const GoalCard: React.FC<GoalCardProps> = ({
           cursor: 'pointer'
         }}
       >
-        <textarea
-          value={goal.text}
-          onChange={(e) => {
-            const newText = e.target.value;
-            // Limit to 45 characters max
-            if (newText.length <= 45) {
-              onTextChange(goal.id, newText);
-            }
+        <div
+          ref={contentRef}
+          contentEditable="true"
+          suppressContentEditableWarning
+          onInput={(e) => {
+            const newText = e.currentTarget.textContent || '';
+            onTextChange(goal.id, newText);
           }}
           onFocus={(e) => {
             // Clear placeholder text on first focus
             if (goal.isPlaceholder) {
-              e.target.select(); // Select all text so it gets replaced when typing
+              // Select all text
+              const range = document.createRange();
+              range.selectNodeContents(e.currentTarget);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
             }
           }}
-          onBlur={() => {
+          onBlur={(e) => {
             // Restore placeholder if left empty
-            if (goal.text.trim() === '') {
+            const text = e.currentTarget.textContent?.trim() || '';
+            if (text === '') {
               onTextChange(
                 goal.id, 
                 !goal.parentId ? 'What\'s your main goal?' : 'New sub-goal'
               );
             }
+          }}
+          onMouseDown={(e) => {
+            // Stop propagation to prevent card selection, but allow natural cursor placement
+            e.stopPropagation();
+          }}
+          onKeyDown={(e) => {
+            // Allow spacebar and other keys to work without triggering canvas panning
+            e.stopPropagation();
           }}
           title={goal.text} // Show full text on hover
           style={{ 
@@ -103,19 +137,23 @@ const GoalCard: React.FC<GoalCardProps> = ({
             outline: 'none', 
             width: '100%',
             height: '60px', // FIXED height
-            resize: 'none',
             backgroundColor: 'transparent',
-            fontSize: `${calculateFontSize(goal.text)}px`, // DYNAMIC font size (PPT-style)
+            fontSize: `${fontSize}px`, // DYNAMIC font size
             fontFamily: 'inherit',
             fontWeight: !goal.parentId ? 'bold' : 'normal', // BOLD for main goal only
             textAlign: 'center',
             overflow: 'hidden', // NO SCROLLBAR
             lineHeight: '1.3',
-            padding: '12px 4px', // Fixed padding
+            padding: `${topPadding} 4px`, // Dynamic top padding
             textDecoration: goal.completed ? 'line-through' : 'none', // Strikethrough when completed
-            color: goal.isPlaceholder ? '#999' : 'inherit' // Gray color for placeholder
+            color: goal.isPlaceholder ? '#999' : 'inherit', // Gray color for placeholder
+            whiteSpace: 'pre-wrap', // Preserve spaces and wrap text
+            wordBreak: 'break-word', // Break long words
+            cursor: 'text' // Show text cursor (I-beam) instead of pointer
           }}
-        />
+        >
+          {/* Content is managed by ref in useEffect - no children needed */}
+        </div>
       </div>
 
       {/* Add Child button - below card */}

@@ -9,6 +9,67 @@ export interface AISubGoal {
 }
 
 /**
+ * Calls Groq API to shorten/condense a long goal into an impactful headline
+ * @param goalText The long goal text to shorten
+ * @returns Shortened, impactful goal headline (max 55 words)
+ */
+export async function shortenGoalText(goalText: string): Promise<string> {
+  if (!GROQ_API_KEY) {
+    throw new Error('GROQ API key not found. Please add REACT_APP_GROQ_API_KEY to your .env file');
+  }
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a goal clarity expert. Transform goal descriptions into clear, impactful headlines. Make them better and more concise, but NEVER longer than the original. Return ONLY the improved goal text, nothing else. No quotes, no explanations.'
+          },
+          {
+            role: 'user',
+            content: `Transform this goal into a clear, impactful headline (make it better but never longer): "${goalText}"`
+          }
+        ],
+        temperature: 0.3, // Lower temperature for more focused, consistent results
+        max_tokens: 50, // Short response needed
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Groq API error response:', errorData);
+      // If API fails, just return original text
+      return goalText;
+    }
+
+    const data = await response.json();
+    const shortenedText = data.choices[0]?.message?.content?.trim();
+
+    if (!shortenedText) {
+      // If no response, return original
+      return goalText;
+    }
+
+    // Remove any surrounding quotes if Groq added them
+    const cleaned = shortenedText.replace(/^["']|["']$/g, '');
+    
+    return cleaned || goalText;
+
+  } catch (error) {
+    console.error('Error calling Groq API for shortening:', error);
+    // On error, return original text so user isn't blocked
+    return goalText;
+  }
+}
+
+/**
  * Calls Groq API to break down a goal into 3-5 actionable sub-goals
  * @param goalText The parent goal text to break down
  * @returns Array of 3-5 sub-goal suggestions
@@ -30,7 +91,7 @@ export async function getAISubGoals(goalText: string): Promise<AISubGoal[]> {
         messages: [
           {
             role: 'system',
-            content: 'You are a goal breakdown assistant. Break down goals into 3-5 specific, actionable sub-goals. Return ONLY a JSON array of strings, nothing else. Example: ["Sub-goal 1", "Sub-goal 2", "Sub-goal 3"]'
+            content: 'You are a goal breakdown assistant. Break down goals into 3-5 specific, actionable sub-goals. CRITICAL: Each sub-goal must be MAX 52 CHARACTERS (ideally 30 characters for best display). Keep them ultra-concise and impactful. Return ONLY a JSON array of strings, nothing else. Example: ["Practice in pool", "Learn breathing", "Join guided swim"]'
           },
           {
             role: 'user',

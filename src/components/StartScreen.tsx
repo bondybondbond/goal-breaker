@@ -310,9 +310,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
                   e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
                 }
               }}
-            >
-              Let's go!
-            </button>
+            >Let's go!</button>
 
             {/* AI Mode Button */}
             <button
@@ -342,9 +340,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
                   e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
                 }
               }}
-            >
-              Get ✨ AI help
-            </button>
+            >Get ✨ AI help</button>
           </div>
         </div>
       </div>

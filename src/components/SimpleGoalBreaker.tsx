@@ -21,12 +21,20 @@ interface SimpleGoalBreakerProps {
 }
 
 const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useAI }) => {
+  // Calculate initial center position
+  // Card dimensions for centering
+  const CARD_WIDTH = 160;
+  const CARD_HEIGHT = 75;
+  
+  const initialCenterX = typeof window !== 'undefined' ? (window.innerWidth / 2 - CARD_WIDTH / 2) : 520;
+  const initialCenterY = typeof window !== 'undefined' ? (window.innerHeight / 3 - CARD_HEIGHT / 2) : 240;
+  
   const [goals, setGoals] = useState<SimpleGoal[]>([
     { 
       id: 1, 
       text: initialGoal || 'What\'s your main goal?', 
       parentId: undefined, 
-      position: { x: 600, y: 80 }, 
+      position: { x: initialCenterX, y: initialCenterY }, 
       isPlaceholder: !initialGoal 
     }
   ]);
@@ -36,6 +44,7 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
   const [helperText, setHelperText] = useState('');
   const [showPanningTip, setShowPanningTip] = useState(false);
+  const [showDebugGrid, setShowDebugGrid] = useState(false);
 
   // ===== AI STATE =====
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -55,6 +64,12 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // ===== VIEWPORT STATE =====
+  const [viewportSize, setViewportSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800
+  });
 
   // ===== AUTO-LOAD FROM LOCALSTORAGE ON MOUNT =====
   useEffect(() => {
@@ -107,10 +122,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
         
         // Create all AI children at once (batch update for efficiency)
         const newChildren: SimpleGoal[] = suggestions.map((suggestion, index) => {
-          // Truncate AI text to 45 chars max
-          const text = suggestion.text.length <= 45 
+          // Truncate AI text to 52 chars max (3 lines)
+          const text = suggestion.text.length <= 52 
             ? suggestion.text 
-            : suggestion.text.substring(0, 42) + '...';
+            : suggestion.text.substring(0, 49) + '...';
           
           return {
             id: nextId + index,
@@ -166,6 +181,26 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       document.removeEventListener('keyup', handleGlobalKeyUp);
     };
   }, []);
+
+  // Track viewport size changes
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Recalculate positions when viewport size changes
+  useEffect(() => {
+    if (goals.length > 0) {
+      recalculateAllPositions();
+    }
+  }, [viewportSize]);
 
   // ===== AUTO-SAVE TO LOCALSTORAGE =====
   useEffect(() => {
@@ -459,8 +494,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     if (rootGoal) {
       // Calculate total tree width to center properly
       const totalTreeWidth = calculateSubtreeWidth(rootGoal.id);
-      const centerX = Math.max(totalTreeWidth / 2 + 100, 600); // At least 600px from left
-      positionNode(rootGoal.id, centerX, 80);
+      // Use dynamic viewport center - adjust for card dimensions
+      const centerX = Math.max(totalTreeWidth / 2, viewportSize.width / 2) - CARD_WIDTH / 2;
+      const centerY = viewportSize.height / 3 - CARD_HEIGHT / 2; // 1/3rd from top, centered
+      positionNode(rootGoal.id, centerX, centerY);
     }
     
     // Return updated goals array with new positions
@@ -478,7 +515,12 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   // OLD positioning function (kept for adding new goals before recalc)
   const calculateGridPosition = (parentId?: number): { x: number; y: number } => {
     if (!parentId) {
-      return { x: 600, y: 80 }; // Ultimate goal at top center
+      // Ultimate goal at viewport center horizontally, 1/3rd from top vertically
+      // Adjust for card dimensions to center properly
+      return { 
+        x: viewportSize.width / 2 - CARD_WIDTH / 2, 
+        y: viewportSize.height / 3 - CARD_HEIGHT / 2
+      };
     }
     
     const parent = goals.find(g => g.id === parentId);
@@ -511,10 +553,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     setNextId(prev => prev + 1);
   };
 
-  // Truncate text to 45 chars max (3 lines × 15 chars)
+  // Truncate text to 52 chars max (3 lines × ~17 chars)
   const truncateText = (text: string): string => {
-    if (text.length <= 45) return text;
-    return text.substring(0, 42) + '...'; // 42 chars + "..." = 45 total
+    if (text.length <= 52) return text;
+    return text.substring(0, 49) + '...'; // 42 chars + "..." = 45 total
   };
 
   // Add a child with custom text (for AI suggestions)
@@ -612,7 +654,16 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   const handleNewCanvas = () => {
     const newCanvasId = `canvas-${Date.now()}`;
     const newGoals = [
-      { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 600, y: 80 }, isPlaceholder: true }
+      { 
+        id: 1, 
+        text: 'What\'s your main goal?', 
+        parentId: undefined, 
+        position: { 
+          x: viewportSize.width / 2 - CARD_WIDTH / 2, 
+          y: viewportSize.height / 3 - CARD_HEIGHT / 2
+        }, 
+        isPlaceholder: true 
+      }
     ];
     
     setCurrentCanvasId(newCanvasId);
@@ -652,7 +703,16 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       // No canvases left, create a fresh one
       const newCanvasId = `canvas-${Date.now()}`;
       const newGoals = [
-        { id: 1, text: 'What\'s your main goal?', parentId: undefined, position: { x: 600, y: 80 }, isPlaceholder: true }
+        { 
+          id: 1, 
+          text: 'What\'s your main goal?', 
+          parentId: undefined, 
+          position: { 
+          x: viewportSize.width / 2 - CARD_WIDTH / 2, 
+          y: viewportSize.height / 3 - CARD_HEIGHT / 2
+        }, 
+          isPlaceholder: true 
+        }
       ];
       setCurrentCanvasId(newCanvasId);
       setGoals(newGoals);
@@ -758,14 +818,141 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       />
 
       {/* Canvas area with positioned goals - WITH PANNING */}
-      <div 
+      <div style={{ position: 'relative' }}>
+        {/* Fixed PPT-Style Rulers - Don't move with pan */}
+        {showDebugGrid && (
+          <>
+            {/* Top Ruler */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '25px',
+              backgroundColor: '#f3f4f6',
+              borderBottom: '1px solid #d1d5db',
+              zIndex: 100,
+              pointerEvents: 'none',
+              overflow: 'hidden'
+            }}>
+              <svg width="100%" height="25">
+                {/* Ruler marks every 50px, centered at 0 like PPT */}
+                {(() => {
+                  const centerX = viewportSize.width / 2;
+                  const marks = [];
+                  // Draw from left edge to right edge
+                  for (let x = 0; x < viewportSize.width; x += 50) {
+                    const rulerValue = Math.round((x - centerX) / 10); // Convert to cm (10px = 1cm)
+                    const isMajor = x % 100 === 0; // Every 100px is major tick
+                    const showNumber = rulerValue % 10 === 0; // Only show numbers at multiples of 10
+                    marks.push(
+                      <g key={`top-${x}`}>
+                        <line
+                          x1={x}
+                          y1={isMajor ? 10 : 15}
+                          x2={x}
+                          y2={25}
+                          stroke="#9ca3af"
+                          strokeWidth="1"
+                        />
+                        {showNumber && (
+                          <text
+                            x={x + 2}
+                            y={9}
+                            fontSize="9"
+                            fill="#4b5563"
+                            fontFamily="Arial, sans-serif"
+                          >
+                            {rulerValue}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  }
+                  return marks;
+                })()}
+              </svg>
+            </div>
+
+            {/* Left Ruler */}
+            <div style={{
+              position: 'absolute',
+              top: '25px',
+              left: 0,
+              width: '25px',
+              bottom: 0,
+              backgroundColor: '#f3f4f6',
+              borderRight: '1px solid #d1d5db',
+              zIndex: 100,
+              pointerEvents: 'none',
+              overflow: 'hidden'
+            }}>
+              <svg width="25" height="100%">
+                {/* Ruler marks every 50px, centered at 0 like PPT */}
+                {(() => {
+                  const centerY = viewportSize.height / 3; // Match our card center position
+                  const marks = [];
+                  // Draw from top edge to bottom edge
+                  for (let y = 0; y < 800; y += 50) {
+                    const rulerValue = Math.round((y - centerY) / 10); // Convert to cm (10px = 1cm)
+                    const isMajor = y % 100 === 0; // Every 100px is major
+                    marks.push(
+                      <g key={`left-${y}`}>
+                        <line
+                          x1={isMajor ? 10 : 15}
+                          y1={y}
+                          x2={25}
+                          y2={y}
+                          stroke="#9ca3af"
+                          strokeWidth="1"
+                        />
+                        {isMajor && (
+                          <text
+                            x={20}
+                            y={y + 3}
+                            fontSize="9"
+                            fill="#4b5563"
+                            fontFamily="Arial, sans-serif"
+                            textAnchor="end"
+                          >
+                            {rulerValue}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  }
+                  return marks;
+                })()}
+              </svg>
+            </div>
+
+            {/* Corner square */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '25px',
+              height: '25px',
+              backgroundColor: '#f3f4f6',
+              borderRight: '1px solid #d1d5db',
+              borderBottom: '1px solid #d1d5db',
+              zIndex: 101,
+              pointerEvents: 'none'
+            }} />
+          </>
+        )}
+
+  <div 
         ref={canvasRef}
         className={`relative w-full overflow-hidden ${isPanning ? 'cursor-grabbing' : spacePressed ? 'cursor-grabbing' : 'cursor-default'}`}
         style={{ 
           height: '800px',
           border: '1px dashed #ccc',
           backgroundColor: '#EFF3FF',
-          outline: 'none'
+          outline: 'none',
+          marginLeft: showDebugGrid ? '25px' : '0',
+          marginTop: showDebugGrid ? '25px' : '0',
+          width: showDebugGrid ? 'calc(100% - 25px)' : '100%'
         }}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
@@ -782,6 +969,72 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
             backgroundColor: 'transparent'
           }}
         >
+          {/* Debug Grid - PPT Style (moves with canvas) */}
+          {showDebugGrid && (
+            <svg
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '2400px',
+                height: '1600px',
+                pointerEvents: 'none',
+                zIndex: 0
+              }}
+            >
+              {/* Light gray grid lines every 100px */}
+              {Array.from({ length: 24 }).map((_, i) => (
+                <line
+                  key={`v${i}`}
+                  x1={i * 100}
+                  y1={0}
+                  x2={i * 100}
+                  y2={1600}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                  opacity="0.5"
+                />
+              ))}
+              {Array.from({ length: 16 }).map((_, i) => (
+                <line
+                  key={`h${i}`}
+                  x1={0}
+                  y1={i * 100}
+                  x2={2400}
+                  y2={i * 100}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                  opacity="0.5"
+                />
+              ))}
+              
+              {/* Center guides - RED (for alignment reference) */}
+              {/* Vertical center line (X=0) */}
+              <line
+                x1={viewportSize.width / 2}
+                y1={0}
+                x2={viewportSize.width / 2}
+                y2={1600}
+                stroke="#ff6b6b"
+                strokeWidth="1.5"
+                strokeDasharray="8,4"
+                opacity="0.6"
+              />
+              
+              {/* Horizontal center line (Y=0) */}
+              <line
+                x1={0}
+                y1={viewportSize.height / 3}
+                x2={2400}
+                y2={viewportSize.height / 3}
+                stroke="#ff6b6b"
+                strokeWidth="1.5"
+                strokeDasharray="8,4"
+                opacity="0.6"
+              />
+            </svg>
+          )}
+          
           {/* Connection Lines - behind cards */}
           <ConnectionLines 
             connections={generateConnections()}
@@ -814,6 +1067,64 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
             />
           )}
         </div>
+      </div>
+      </div> {/* Close ruler wrapper */}
+
+      {/* Debug Info - Compact */}
+      {showDebugGrid && (
+        <div style={{
+          position: 'fixed',
+          top: '125px',
+          right: '24px',
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          border: '1px solid #d1d5db',
+          borderRadius: '6px',
+          padding: '8px 10px',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          zIndex: 1000,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          lineHeight: '1.4'
+        }}>
+          <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '4px' }}>
+            📐 Ruler Mode
+          </div>
+          <div style={{ color: '#374151', fontSize: '9px' }}>
+            Center = 0, 0
+          </div>
+          <div style={{ color: '#9ca3af', fontSize: '9px', marginTop: '2px' }}>
+            Units: 10px = 1 ruler mark
+          </div>
+        </div>
+      )}
+
+      {/* Debug Grid Toggle - Top Right */}
+      <div style={{
+        position: 'fixed',
+        top: '75px',
+        right: '74px',
+        zIndex: 1000
+      }}>
+        <button
+          onClick={() => setShowDebugGrid(!showDebugGrid)}
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '4px',
+            backgroundColor: showDebugGrid ? '#8b5cf6' : 'white',
+            color: showDebugGrid ? 'white' : 'black',
+            border: '1px solid #ccc',
+            cursor: 'pointer',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+          title={showDebugGrid ? "Hide rulers & guides" : "Show rulers & guides (PPT-style)"}
+        >
+          📐
+        </button>
       </div>
 
       {/* Lightbulb Tip Button - Top Right */}

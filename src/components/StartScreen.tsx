@@ -10,7 +10,6 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [canvasList, setCanvasList] = useState<any[]>([]);
-  const maxChars = 55;
 
   // Auto-focus on mount (like Google)
   React.useEffect(() => {
@@ -28,7 +27,12 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
 
   const handleSubmit = (useAI: boolean) => {
     if (goalText.trim()) {
-      onStart(goalText.trim(), useAI);
+      let processedGoal = goalText.trim();
+      // For manual mode, truncate to 55 chars + ".." if needed
+      if (!useAI && processedGoal.length > 55) {
+        processedGoal = processedGoal.substring(0, 55) + '..';
+      }
+      onStart(processedGoal, useAI);
     }
   };
 
@@ -230,11 +234,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
           <textarea
             ref={inputRef}
             value={goalText}
-            onChange={(e) => {
-              if (e.target.value.length <= maxChars) {
-                setGoalText(e.target.value);
-              }
-            }}
+            onChange={(e) => setGoalText(e.target.value)}
             placeholder="Type your goal here..."
             style={{
               width: '100%',
@@ -265,16 +265,6 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
               }
             }}
           />
-
-          {/* Character Counter */}
-          <div style={{
-            textAlign: 'right',
-            fontSize: '12px',
-            color: goalText.length >= maxChars ? '#FCA5A5' : 'rgba(255,255,255,0.7)',
-            marginBottom: '24px'
-          }}>
-            {goalText.length}/{maxChars}
-          </div>
 
           {/* Buttons */}
           <div style={{

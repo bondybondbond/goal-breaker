@@ -44,21 +44,26 @@ const GoalCard: React.FC<GoalCardProps> = ({
     return parent ? calculateLevel(parent) + 1 : 0;
   };
 
-  // Font sizing based on actual line capacity (16px font = 15 chars per line)
+  // Font sizing based on character count (max 57 chars)
   const calculateFontSize = (text: string): { fontSize: number; topPadding: string } => {
     const charCount = text.length;
     
-    // 1 sentence (≤15 chars): Keep size 16, middle align
+    // ≤15 chars: 16px font, middle align
     if (charCount <= 15) {
       return { fontSize: 16, topPadding: '20px' };
     }
     
-    // 2 sentences (16-30 chars): Keep size 16, move slightly up
+    // 16-30 chars: 16px font, move slightly up
     if (charCount <= 30) {
       return { fontSize: 16, topPadding: '12px' };
     }
     
-    // 3+ sentences (31+ chars): Top align, shrink font
+    // 31-45 chars: 16px font, top align
+    if (charCount <= 45) {
+      return { fontSize: 16, topPadding: '4px' };
+    }
+    
+    // 46-57 chars: 13px font, top align
     return { fontSize: 13, topPadding: '4px' };
   };
 
@@ -100,7 +105,21 @@ const GoalCard: React.FC<GoalCardProps> = ({
           suppressContentEditableWarning
           onInput={(e) => {
             const newText = e.currentTarget.textContent || '';
-            onTextChange(goal.id, newText);
+            // Enforce 57 character limit
+            if (newText.length > 57) {
+              const truncated = newText.substring(0, 57);
+              e.currentTarget.textContent = truncated;
+              // Move cursor to end
+              const range = document.createRange();
+              const selection = window.getSelection();
+              range.selectNodeContents(e.currentTarget);
+              range.collapse(false);
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+              onTextChange(goal.id, truncated);
+            } else {
+              onTextChange(goal.id, newText);
+            }
           }}
           onFocus={(e) => {
             // Clear placeholder text on first focus

@@ -20,13 +20,24 @@ function App() {
     setHasStarted(true);
   };
 
+  // Handle returning to splash screen (e.g., after deleting canvas)
+  const handleReturnToHome = () => {
+    setHasStarted(false);
+    setInitialGoal('');
+    setUseAI(false);
+  };
+
   if (!hasStarted) {
     return <StartScreen onStart={handleStart} onLoadCanvas={handleLoadCanvas} />;
   }
 
   return (
     <div className="App">
-      <SimpleGoalBreaker initialGoal={initialGoal} useAI={useAI} />
+      <SimpleGoalBreaker 
+        initialGoal={initialGoal} 
+        useAI={useAI} 
+        onReturnToHome={handleReturnToHome}
+      />
     </div>
   );
 }

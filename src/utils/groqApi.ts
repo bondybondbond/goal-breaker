@@ -30,22 +30,22 @@ export async function shortenGoalText(goalText: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a goal clarity expert. Transform goal descriptions into clear, impactful headlines. Make them better and more concise, but NEVER longer than the original. Return ONLY the improved goal text, nothing else. No quotes, no explanations.'
+            content: 'You are a goal clarity expert. Transform goals into clear, concise headlines. CRITICAL: Keep between 30-57 characters. Preserve key details while being concise. Return ONLY the improved goal text - no quotes, no explanations.'
           },
           {
             role: 'user',
-            content: `Transform this goal into a clear, impactful headline (make it better but never longer): "${goalText}"`
+            content: `Make this goal clear and concise (30-57 chars, preserve key details): "${goalText}"`
           }
         ],
-        temperature: 0.3, // Lower temperature for more focused, consistent results
-        max_tokens: 50, // Short response needed
+        temperature: 0.5, // Balanced temp for preserving details while condensing
+        max_tokens: 20, // ~57 chars = 15 tokens + buffer
+        top_p: 0.9, // Slight nucleus sampling for quality
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.text();
       console.error('Groq API error response:', errorData);
-      // If API fails, just return original text
       return goalText;
     }
 
@@ -53,18 +53,17 @@ export async function shortenGoalText(goalText: string): Promise<string> {
     const shortenedText = data.choices[0]?.message?.content?.trim();
 
     if (!shortenedText) {
-      // If no response, return original
       return goalText;
     }
 
     // Remove any surrounding quotes if Groq added them
     const cleaned = shortenedText.replace(/^["']|["']$/g, '');
     
-    return cleaned || goalText;
+    // Enforce 57 char limit as safety net
+    return cleaned.length <= 57 ? cleaned : cleaned.substring(0, 57);
 
   } catch (error) {
     console.error('Error calling Groq API for shortening:', error);
-    // On error, return original text so user isn't blocked
     return goalText;
   }
 }
@@ -91,15 +90,16 @@ export async function getAISubGoals(goalText: string): Promise<AISubGoal[]> {
         messages: [
           {
             role: 'system',
-            content: 'You are a goal breakdown assistant. Break down goals into 3-5 specific, actionable sub-goals. CRITICAL: Each sub-goal must be MAX 52 CHARACTERS (ideally 30 characters for best display). Keep them ultra-concise and impactful. Return ONLY a JSON array of strings, nothing else. Example: ["Practice in pool", "Learn breathing", "Join guided swim"]'
+            content: 'You are a goal breakdown expert. Create 3-5 actionable sub-goals. CRITICAL CHARACTER LIMITS: Ideal = 30 chars, Maximum = 57 chars. Be ultra-concise. Return ONLY a JSON array of strings. Example: ["Practice in pool","Learn breathing","Join swim class"]'
           },
           {
             role: 'user',
-            content: `Break down this goal into 3-5 specific, actionable sub-goals: "${goalText}"`
+            content: `Break "${goalText}" into 3-5 sub-goals (each 30 chars ideal, 57 max)`
           }
         ],
-        temperature: 0.7,
-        max_tokens: 500,
+        temperature: 0.7, // Balanced creativity/consistency
+        max_tokens: 150, // 5 goals × 15 tokens + JSON overhead
+        top_p: 0.95, // High-quality token selection
       }),
     });
 
@@ -129,7 +129,10 @@ export async function getAISubGoals(goalText: string): Promise<AISubGoal[]> {
           .split('\n')
           .map((line: string) => line.trim())
           .filter((line: string) => line.length > 0)
-          .map((line: string) => line.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, ''))
+          .map((line: string) => {
+            // Remove bullets, numbers, quotes
+            return line.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').replace(/^["']|["']$/g, '');
+          })
           .slice(0, 5);
       }
     } catch (parseError) {
@@ -137,9 +140,9 @@ export async function getAISubGoals(goalText: string): Promise<AISubGoal[]> {
       throw new Error('Failed to parse AI suggestions');
     }
 
-    // Convert to AISubGoal objects with unique IDs
+    // Convert to AISubGoal objects with unique IDs and enforce 57-char limit
     return subGoals.map((text, index) => ({
-      text: text.trim(),
+      text: text.trim().substring(0, 57), // Hard limit at 57 chars
       id: `ai-suggestion-${Date.now()}-${index}`,
     }));
 

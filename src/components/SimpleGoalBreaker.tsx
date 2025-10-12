@@ -4,7 +4,7 @@ import { Connection } from '../types/goal.types';
 import Toolbar from './Toolbar';
 import CanvasMenu from './CanvasMenu';
 import GoalCard from './GoalCard';
-import { getAISubGoals } from '../utils/groqApi';
+import { getAISubGoals, shortenGoalText } from '../utils/groqApi';
 
 interface SimpleGoal {
   id: number;
@@ -18,9 +18,10 @@ interface SimpleGoal {
 interface SimpleGoalBreakerProps {
   initialGoal?: string;
   useAI?: boolean;
+  onReturnToHome?: () => void;
 }
 
-const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useAI }) => {
+const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useAI, onReturnToHome }) => {
   // Calculate initial center position
   // Card dimensions for centering
   const CARD_WIDTH = 160;
@@ -117,7 +118,20 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       setIsLoadingAI(true); // Show loading state
       
       try {
-        const suggestions = await getAISubGoals(mainGoal.text);
+        // Step 1: Shorten the main goal text first
+        console.log('📝 Shortening main goal...');
+        const shortenedMainGoal = await shortenGoalText(mainGoal.text);
+        console.log('✅ Shortened to:', shortenedMainGoal);
+        
+        // Update main goal with shortened text
+        setGoals(prev => prev.map(g => 
+          g.id === mainGoal.id 
+            ? { ...g, text: shortenedMainGoal, isPlaceholder: false }
+            : g
+        ));
+        
+        // Step 2: Generate sub-goals using the shortened text
+        const suggestions = await getAISubGoals(shortenedMainGoal);
         console.log('✅ Auto-generated', suggestions.length, 'suggestions');
         
         // Create all AI children at once (batch update for efficiency)
@@ -202,11 +216,32 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     }
   }, [viewportSize]);
 
+  // Warn user before refreshing page (would return to homepage/splash screen)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Standard way to show browser confirmation dialog
+      e.preventDefault();
+      e.returnValue = ''; // Required for Chrome
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   // ===== AUTO-SAVE TO LOCALSTORAGE =====
   useEffect(() => {
     // Auto-generate canvas name from main goal (first 20 chars)
     const mainGoal = goals.find(g => !g.parentId);
     const canvasName = mainGoal ? mainGoal.text.substring(0, 20) : 'Untitled Canvas';
+    
+    // Don't save completely empty canvases (only placeholder main goal, nothing else)
+    const isEmptyCanvas = goals.length === 1 && 
+                          mainGoal?.isPlaceholder === true;
+    
+    if (isEmptyCanvas) {
+      console.log('⏭️ Skipping save - canvas is empty');
+      return;
+    }
     
     try {
       // Load existing canvas list
@@ -652,23 +687,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
 
   // ===== CANVAS MENU HANDLERS =====
   const handleNewCanvas = () => {
-    const newCanvasId = `canvas-${Date.now()}`;
-    const newGoals = [
-      { 
-        id: 1, 
-        text: 'What\'s your main goal?', 
-        parentId: undefined, 
-        position: { 
-          x: viewportSize.width / 2 - CARD_WIDTH / 2, 
-          y: viewportSize.height / 3 - CARD_HEIGHT / 2
-        }, 
-        isPlaceholder: true 
-      }
-    ];
-    
-    setCurrentCanvasId(newCanvasId);
-    setGoals(newGoals);
-    setNextId(2);
+    // Return to splash screen to start a new canvas
+    if (onReturnToHome) {
+      onReturnToHome();
+    }
   };
 
   const handleSwitchCanvas = (canvasId: string) => {
@@ -693,30 +715,9 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     localStorage.setItem('canvasList', JSON.stringify(updatedList));
     setCanvasList(updatedList);
     
-    // Switch to another canvas or create new one
-    if (updatedList.length > 0) {
-      const nextCanvas = updatedList[0];
-      setCurrentCanvasId(nextCanvas.id);
-      setGoals(nextCanvas.goals);
-      setNextId(nextCanvas.nextId);
-    } else {
-      // No canvases left, create a fresh one
-      const newCanvasId = `canvas-${Date.now()}`;
-      const newGoals = [
-        { 
-          id: 1, 
-          text: 'What\'s your main goal?', 
-          parentId: undefined, 
-          position: { 
-          x: viewportSize.width / 2 - CARD_WIDTH / 2, 
-          y: viewportSize.height / 3 - CARD_HEIGHT / 2
-        }, 
-          isPlaceholder: true 
-        }
-      ];
-      setCurrentCanvasId(newCanvasId);
-      setGoals(newGoals);
-      setNextId(2);
+    // Return to splash screen after deletion
+    if (onReturnToHome) {
+      onReturnToHome();
     }
   };
 

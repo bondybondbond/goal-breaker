@@ -362,8 +362,19 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     setAiSuggestions([]); // Clear previous suggestions
     
     try {
-      const suggestions = await getAISubGoals(selectedGoal.text);
-      console.log('✅ Got', suggestions.length, 'suggestions');
+      // Gather context for better AI suggestions
+      const mainGoal = goals.find(g => !g.parentId);
+      const parentGoal = selectedGoal.parentId ? goals.find(g => g.id === selectedGoal.parentId) : undefined;
+      const siblingGoals = selectedGoal.parentId 
+        ? goals.filter(g => g.parentId === selectedGoal.parentId && g.id !== selectedGoal.id).map(g => g.text)
+        : [];
+      
+      const suggestions = await getAISubGoals(selectedGoal.text, {
+        mainGoal: mainGoal?.text,
+        parentGoalText: parentGoal?.text,
+        siblingGoals: siblingGoals
+      });
+      console.log('✅ Got', suggestions.length, 'suggestions with context');
       
       // Extract just the text from suggestions
       const suggestionTexts = suggestions.map(s => s.text);

@@ -73,7 +73,14 @@ export async function shortenGoalText(goalText: string): Promise<string> {
  * @param goalText The parent goal text to break down
  * @returns Array of 3-5 sub-goal suggestions
  */
-export async function getAISubGoals(goalText: string): Promise<AISubGoal[]> {
+export async function getAISubGoals(
+  goalText: string, 
+  context?: {
+    parentGoalText?: string;
+    siblingGoals?: string[];
+    mainGoal?: string;
+  }
+): Promise<AISubGoal[]> {
   if (!GROQ_API_KEY) {
     throw new Error('GROQ API key not found. Please add REACT_APP_GROQ_API_KEY to your .env file');
   }
@@ -90,11 +97,34 @@ export async function getAISubGoals(goalText: string): Promise<AISubGoal[]> {
         messages: [
           {
             role: 'system',
-            content: 'You are a goal breakdown expert. Create 3-5 actionable sub-goals. CRITICAL CHARACTER LIMITS: Ideal = 30 chars, Maximum = 57 chars. Be ultra-concise. Return ONLY a JSON array of strings. Example: ["Practice in pool","Learn breathing","Join swim class"]'
+            content: 'You are a goal breakdown expert. Create 3-5 actionable sub-goals using format "[Action] to [benefit]". CRITICAL: Aim for 35-45 chars (be specific, not brief!). Avoid repeating parent goal content. Return ONLY a JSON array of strings.'
           },
           {
             role: 'user',
-            content: `Break "${goalText}" into 3-5 sub-goals (each 30 chars ideal, 57 max)`
+            content: (() => {
+              let prompt = `Break "${goalText}" into 3-5 specific sub-goals using "[Action] to [benefit]" format (35-45 chars).`;
+              
+              // Add context if provided
+              if (context?.mainGoal) {
+                prompt += `
+
+Ultimate goal: "${context.mainGoal}"`;
+              }
+              if (context?.parentGoalText) {
+                prompt += `
+Parent already covers: "${context.parentGoalText}"`;
+              }
+              if (context?.siblingGoals && context.siblingGoals.length > 0) {
+                prompt += `
+Sibling goals already exist: ${context.siblingGoals.map(s => `"${s}"`).join(', ')}`;
+              }
+              
+              prompt += `
+
+Create NEW sub-goals that don't repeat parent/sibling content. Be specific and actionable.`;
+              
+              return prompt;
+            })()
           }
         ],
         temperature: 0.7, // Balanced creativity/consistency

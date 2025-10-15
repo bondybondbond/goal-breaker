@@ -33,9 +33,15 @@ const GoalCard: React.FC<GoalCardProps> = ({
   // Update content only when goal changes (not during typing)
   useEffect(() => {
     if (contentRef.current && contentRef.current.textContent !== goal.text) {
-      contentRef.current.textContent = goal.text;
+      // Use innerHTML with escaped text to force proper layout
+      // This triggers browser's text wrapping engine properly
+      const escapedText = goal.text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      contentRef.current.innerHTML = escapedText;
     }
-  }, [goal.id, goal.text]); // Update when goal changes or text changes externally
+  }, [goal.id, goal.text]); // Update when goal changes or text changes externally // Update when goal changes or text changes externally // Update when goal changes or text changes externally // Update when goal changes or text changes externally // Update when goal changes or text changes externally
   
   // Calculate goal level for styling
   const calculateLevel = (g: SimpleGoal): number => {

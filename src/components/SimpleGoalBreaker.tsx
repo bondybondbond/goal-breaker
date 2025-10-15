@@ -602,7 +602,7 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   // Truncate text to 52 chars max (3 lines × ~17 chars)
   const truncateText = (text: string): string => {
     if (text.length <= 52) return text;
-    return text.substring(0, 49) + '...'; // 42 chars + "..." = 45 total
+    return text.substring(0, 49) + '...'; // 49 chars + "..." = 52 total
   };
 
   // Add a child with custom text (for AI suggestions)

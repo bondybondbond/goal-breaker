@@ -97,12 +97,12 @@ export async function getAISubGoals(
         messages: [
           {
             role: 'system',
-            content: 'You are a goal breakdown expert. Create 3-5 actionable sub-goals using format "[Action] to [benefit]". CRITICAL: Aim for 35-45 chars (be specific, not brief!). Avoid repeating parent goal content. Return ONLY a JSON array of strings.'
+            content: 'You are a goal breakdown expert. Create 3-5 specific, actionable sub-goals as imperative commands (e.g., "Expand professional network", "Master financial modeling"). CRITICAL: Keep 20-40 chars. Be specific and direct. Avoid repeating parent goal. Return ONLY a JSON array of strings.'
           },
           {
             role: 'user',
             content: (() => {
-              let prompt = `Break "${goalText}" into 3-5 specific sub-goals using "[Action] to [benefit]" format (35-45 chars).`;
+              let prompt = `Break "${goalText}" into 3-5 specific sub-goals as imperative commands (20-40 chars). Be specific and actionable.`;
               
               // Add context if provided
               if (context?.mainGoal) {

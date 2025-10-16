@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import StartScreen from './components/StartScreen';
 import SimpleGoalBreaker from './components/SimpleGoalBreaker';
 
@@ -38,6 +39,7 @@ function App() {
         useAI={useAI} 
         onReturnToHome={handleReturnToHome}
       />
+      <Analytics />
     </div>
   );
 }

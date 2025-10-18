@@ -38,7 +38,14 @@ const CanvasMenu: React.FC<CanvasMenuProps> = ({
   if (!isOpen) return null;
 
   const currentCanvas = canvasList.find((c: any) => c.id === currentCanvasId);
-  const otherCanvases = canvasList.filter((c: any) => c.id !== currentCanvasId);
+  // Sort by lastSaved (most recent first)
+  const otherCanvases = canvasList
+    .filter((c: any) => c.id !== currentCanvasId)
+    .sort((a: any, b: any) => {
+      const dateA = new Date(a.lastSaved || 0).getTime();
+      const dateB = new Date(b.lastSaved || 0).getTime();
+      return dateB - dateA; // Descending order (newest first)
+    });
 
   const getCurrentCanvasName = () => {
     if (currentCanvas?.customName) {

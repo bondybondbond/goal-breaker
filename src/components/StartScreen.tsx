@@ -164,7 +164,13 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
               <p style={{ color: '#999', fontSize: '14px' }}>No saved canvases yet. Create your first goal above!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {canvasList.map((canvas) => (
+                {canvasList
+                  .sort((a: any, b: any) => {
+                    const dateA = new Date(a.lastSaved || 0).getTime();
+                    const dateB = new Date(b.lastSaved || 0).getTime();
+                    return dateB - dateA; // Descending order (newest first)
+                  })
+                  .map((canvas) => (
                   <button
                     key={canvas.id}
                     onClick={() => {
@@ -194,7 +200,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart, onLoadCanvas }) => {
                       {canvas.name}
                     </div>
                     <div style={{ fontSize: '12px', color: '#666' }}>
-                      {canvas.goals?.length || 0} goals
+                      {canvas.goals?.length || 0} goal{canvas.goals?.length !== 1 ? 's' : ''} • {new Date(canvas.lastSaved).toLocaleDateString()}
                     </div>
                   </button>
                 ))}

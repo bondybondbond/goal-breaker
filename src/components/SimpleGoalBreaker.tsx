@@ -55,7 +55,34 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // ===== CANVAS STATE =====
-  const [currentCanvasId, setCurrentCanvasId] = useState<string>('canvas-1');
+  // Generate unique canvas ID on mount
+  const [currentCanvasId, setCurrentCanvasId] = useState<string>(() => {
+    // If creating NEW canvas (has initialGoal), generate unique ID
+    if (initialGoal) {
+      try {
+        const storedList = localStorage.getItem('canvasList');
+        const list = storedList ? JSON.parse(storedList) : [];
+        
+        // Find highest canvas number
+        const maxNum = list.reduce((max: number, canvas: any) => {
+          const match = canvas.id.match(/canvas-(\d+)/);
+          if (match) {
+            const num = parseInt(match[1]);
+            return num > max ? num : max;
+          }
+          return max;
+        }, 0);
+        
+        const newId = `canvas-${maxNum + 1}`;
+        return newId;
+      } catch (error) {
+        console.error('❌ Failed to generate canvas ID, defaulting to canvas-1');
+        return 'canvas-1';
+      }
+    }
+    // Loading existing canvas - will be overwritten by load effect
+    return 'canvas-1';
+  });
   const [canvasList, setCanvasList] = useState<any[]>([]);
 
 
@@ -74,17 +101,19 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
 
   // ===== AUTO-LOAD FROM LOCALSTORAGE ON MOUNT =====
   useEffect(() => {
+    
     // If we have an initialGoal, we're starting fresh - don't load old canvas
     if (initialGoal) {
-      console.log('🆕 Starting new board with goal:', initialGoal);
       return;
     }
 
     try {
+      
       // Load canvas list
       const storedList = localStorage.getItem('canvasList');
+
       const list = storedList ? JSON.parse(storedList) : [];
-      setCanvasList(list);
+setCanvasList(list);
       
       // Load last active canvas ID
       const lastCanvasId = localStorage.getItem('currentCanvasId') || 'canvas-1';
@@ -95,12 +124,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       if (canvas) {
         setGoals(canvas.goals);
         setNextId(canvas.nextId);
-        console.log('✅ Loaded canvas:', canvas.name);
       } else {
-        console.log('No saved canvas found, starting fresh');
       }
     } catch (error) {
-      console.error('Failed to load from localStorage:', error);
+      console.error('❌ Failed to load from localStorage:', error);
     }
   }, []); // Empty dependency array = run once on mount
 
@@ -114,14 +141,11 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
       const mainGoal = goals.find(g => !g.parentId);
       if (!mainGoal) return;
 
-      console.log('🤖 Auto-generating AI suggestions for:', mainGoal.text);
       setIsLoadingAI(true); // Show loading state
       
       try {
         // Step 1: Shorten the main goal text first
-        console.log('📝 Shortening main goal...');
         const shortenedMainGoal = await shortenGoalText(mainGoal.text);
-        console.log('✅ Shortened to:', shortenedMainGoal);
         
         // Update main goal with shortened text
         setGoals(prev => prev.map(g => 
@@ -132,7 +156,6 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
         
         // Step 2: Generate sub-goals using the shortened text
         const suggestions = await getAISubGoals(shortenedMainGoal);
-        console.log('✅ Auto-generated', suggestions.length, 'suggestions');
         
         // Create all AI children at once (batch update for efficiency)
         const newChildren: SimpleGoal[] = suggestions.map((suggestion, index) => {
@@ -159,7 +182,6 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
         // Update nextId to account for all new goals
         setNextId(prev => prev + suggestions.length);
         
-        console.log('🎉 AI breakdown complete!');
       } catch (error) {
         console.error('❌ Auto-AI failed:', error);
         alert('Failed to generate AI suggestions. Please try the ✨ button manually.');
@@ -230,6 +252,7 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
 
   // ===== AUTO-SAVE TO LOCALSTORAGE =====
   useEffect(() => {
+    
     // Auto-generate canvas name from main goal (first 20 chars)
     const mainGoal = goals.find(g => !g.parentId);
     const canvasName = mainGoal ? mainGoal.text.substring(0, 20) : 'Untitled Canvas';
@@ -239,17 +262,18 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
                           mainGoal?.isPlaceholder === true;
     
     if (isEmptyCanvas) {
-      console.log('⏭️ Skipping save - canvas is empty');
       return;
     }
     
     try {
+      
       // Load existing canvas list
       const stored = localStorage.getItem('canvasList');
       let list = stored ? JSON.parse(stored) : [];
       
       // Update or add current canvas
       const canvasIndex = list.findIndex((c: any) => c.id === currentCanvasId);
+      
       const canvasData = {
         id: currentCanvasId,
         name: canvasName,
@@ -264,14 +288,34 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
         list.push(canvasData);
       }
       
+      // Enforce 10-canvas limit
+      const MAX_CANVASES = 10;
+      if (list.length > MAX_CANVASES) {
+        // Sort by lastSaved to find oldest
+        list.sort((a: any, b: any) => {
+          const dateA = new Date(a.lastSaved || 0).getTime();
+          const dateB = new Date(b.lastSaved || 0).getTime();
+          return dateA - dateB; // Ascending order (oldest first)
+        });
+        
+        // Remove oldest canvas
+        const removed = list.shift();
+      }
+      
+      
       // Save updated list
       localStorage.setItem('canvasList', JSON.stringify(list));
       localStorage.setItem('currentCanvasId', currentCanvasId);
       
+      
       // Update local canvas list state
       setCanvasList(list);
     } catch (error) {
-      console.error('Failed to save to localStorage:', error);
+      console.error('❌ SAVE FAILED:', error);
+      if (error instanceof Error) {
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error type:', error.name);
+      }
     }
   }, [goals, nextId, currentCanvasId]);
 
@@ -357,7 +401,6 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
     const selectedGoal = goals.find(g => g.id === selectedGoalId);
     if (!selectedGoal) return;
 
-    console.log('💡 Getting AI suggestions for:', selectedGoal.text);
     setIsLoadingAI(true);
     setAiSuggestions([]); // Clear previous suggestions
     
@@ -374,7 +417,6 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
         parentGoalText: parentGoal?.text,
         siblingGoals: siblingGoals
       });
-      console.log('✅ Got', suggestions.length, 'suggestions with context');
       
       // Extract just the text from suggestions
       const suggestionTexts = suggestions.map(s => s.text);
@@ -1257,7 +1299,6 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
                 key={index}
                 onClick={() => {
                   if (selectedGoalId) {
-                    console.log('Adding AI suggestion as child:', suggestion);
                     addChildWithText(selectedGoalId, suggestion);
                     // Remove this suggestion from the list
                     setAiSuggestions(prev => prev.filter((_, i) => i !== index));

@@ -50,6 +50,8 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
   // ===== AI STATE =====
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [showAIButtonHint, setShowAIButtonHint] = useState(false);
 
   // ===== MENU STATE =====
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1246,20 +1248,18 @@ setCanvasList(list);
       </div>
 
       {/* Helper Text - Bottom Center */}
-      {/* AI Suggestions Panel */}
+      {/* AI Suggestions Panel - Right Side Above Button */}
       {aiSuggestions.length > 0 && (
         <div style={{
           position: 'fixed',
-          bottom: '80px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          bottom: '82px',
+          right: '24px',
           zIndex: 1000,
           backgroundColor: 'white',
           padding: '16px',
           borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          maxWidth: '600px',
-          minWidth: '400px'
+          width: '380px'
         }}>
           <div style={{ 
             display: 'flex', 
@@ -1400,34 +1400,64 @@ setCanvasList(list);
         </div>
       )}
 
+      {/* AI Button Hint Tooltip */}
+      {showAIButtonHint && (
+        <div style={{
+          position: 'fixed',
+          bottom: '82px',
+          right: '24px',
+          backgroundColor: '#FFF9C4',
+          color: '#78350F',
+          padding: '8px 14px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: '500',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          border: '2px solid #F59E0B',
+          zIndex: 1001,
+          whiteSpace: 'nowrap'
+        }}>
+          👆 Select a goal first
+        </div>
+      )}
+
       {/* AI Assist Button - Bottom Right */}
-      {selectedGoalId && (
-        <button
-          onClick={handleGetAISuggestions}
+      <button
+        onClick={() => {
+          if (!selectedGoalId) {
+            setShowAIButtonHint(true);
+            setTimeout(() => setShowAIButtonHint(false), 2500);
+            return;
+          }
+          handleGetAISuggestions();
+        }}
           disabled={isLoadingAI}
           style={{
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            width: '56px',
-            height: '56px',
-            backgroundColor: isLoadingAI ? '#9CA3AF' : '#8b5cf6',
+            height: '48px',
+          padding: '0 20px',
+          backgroundColor: isLoadingAI ? '#9CA3AF' : selectedGoalId ? '#8b5cf6' : '#D1D5DB',
+          color: selectedGoalId || isLoadingAI ? 'white' : '#6B7280',
             border: 'none',
-            borderRadius: '50%',
-            fontSize: '28px',
-            cursor: isLoadingAI ? 'wait' : 'pointer',
+            borderRadius: '24px',
+          fontSize: '14px',
+          fontWeight: '600',
+          cursor: isLoadingAI ? 'wait' : selectedGoalId ? 'pointer' : 'not-allowed',
             zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s',
+          gap: '8px',
+          transition: 'all 0.2s',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
           }}
-          title={isLoadingAI ? 'AI is thinking...' : 'Get AI suggestions for this goal'}
+          title={isLoadingAI ? 'AI is thinking...' : !selectedGoalId ? 'Select a goal first' : 'Get AI suggestions for this goal'}
         >
-          {isLoadingAI ? '⏳' : '✨'}
-        </button>
-      )}
+          <span style={{ fontSize: '18px' }}>{isLoadingAI ? '⏳' : '✨'}</span>
+        <span>{isLoadingAI ? 'Thinking...' : 'Get ideas'}</span>
+      </button>
     </div>
   );
 };

@@ -13,6 +13,7 @@ interface SimpleGoal {
   position: { x: number; y: number };
   completed?: boolean; // Track completion state
   isPlaceholder?: boolean; // Track if text is placeholder
+  priority?: 'high' | 'medium' | 'low'; // Priority level (optional)
 }
 
 interface SimpleGoalBreakerProps {
@@ -55,6 +56,10 @@ const SimpleGoalBreaker: React.FC<SimpleGoalBreakerProps> = ({ initialGoal, useA
 
   // ===== MENU STATE =====
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // ===== CANVAS NAME EDITING =====
+  const [isEditingCanvasName, setIsEditingCanvasName] = useState(false);
+  const [editedCanvasName, setEditedCanvasName] = useState('');
 
   // ===== CANVAS STATE =====
   // Generate unique canvas ID on mount
@@ -198,7 +203,7 @@ setCanvasList(list);
   // Global spacebar detection for panning
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && document.activeElement?.tagName !== 'TEXTAREA') {
+      if (e.code === 'Space' && document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT') {
         setSpacePressed(true);
         e.preventDefault();
       }
@@ -475,6 +480,24 @@ setCanvasList(list);
     setIsPanning(false);
   };
 
+  // Handle trackpad two-finger scrolling (wheel event)
+  const handleWheel = (e: React.WheelEvent) => {
+    // Don't interfere if user is editing text
+    if (document.activeElement?.tagName === 'TEXTAREA') return;
+    
+    // Prevent default browser scrolling
+    e.preventDefault();
+    
+    // deltaX and deltaY give us the scroll direction and distance
+    // Sensitivity factor to make panning feel natural (can tune this)
+    const sensitivity = 1.0;
+    
+    setCanvasOffset(prev => ({
+      x: prev.x - e.deltaX * sensitivity,
+      y: prev.y - e.deltaY * sensitivity
+    }));
+  };
+
 
 
   // Helper: Check if a goal is a leaf (no children)
@@ -740,6 +763,22 @@ setCanvasList(list);
     }
   };
 
+  // ===== CANVAS NAME HELPER =====
+  const getCurrentCanvasName = (maxLength?: number): string => {
+    const currentCanvas = canvasList.find((c: any) => c.id === currentCanvasId);
+    if (currentCanvas?.customName) {
+      return currentCanvas.customName;
+    }
+    const mainGoal = goals.find(g => !g.parentId);
+    if (!mainGoal) return 'Untitled Canvas';
+    
+    // If maxLength specified, truncate
+    if (maxLength && mainGoal.text.length > maxLength) {
+      return mainGoal.text.substring(0, maxLength) + '...';
+    }
+    return mainGoal.text;
+  };
+
   // ===== CANVAS MENU HANDLERS =====
   const handleNewCanvas = () => {
     // Return to splash screen to start a new canvas
@@ -781,6 +820,15 @@ setCanvasList(list);
     setGoals(prev => prev.map(goal => 
       goal.id === goalId 
         ? { ...goal, completed: !goal.completed } 
+        : goal
+    ));
+  };
+
+  // Set goal priority
+  const setPriority = (goalId: number, priority: 'high' | 'medium' | 'low' | undefined) => {
+    setGoals(prev => prev.map(goal => 
+      goal.id === goalId 
+        ? { ...goal, priority } 
         : goal
     ));
   };
@@ -832,9 +880,21 @@ setCanvasList(list);
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ fontFamily: 'Arial, sans-serif' }}>
       {/* Header with menu button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '10px' }}>
+      <div style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '15px', 
+        padding: '20px',
+        backgroundColor: 'white',
+        zIndex: 1000,
+        borderBottom: '1px solid #e5e7eb'
+      }}>
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           style={{
@@ -854,10 +914,102 @@ setCanvasList(list);
           ☰
         </button>
 
+        <button
+          onClick={() => {
+            if (window.confirm('Return to home? Current canvas is auto-saved.')) {
+              if (onReturnToHome) onReturnToHome();
+            }
+          }}
+          style={{
+            width: '40px',
+            height: '40px',
+            border: '1px solid #ccc',
+            backgroundColor: 'white',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px'
+          }}
+          title="Return to home screen"
+        >
+          🏠
+        </button>
+
         <h2 style={{ outline: 'none', userSelect: 'none', margin: 0, fontFamily: '"Segoe UI Black", "Arial Black", sans-serif', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '26px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontStyle: 'normal' }}>🎯</span>
           <span style={{ fontStyle: 'italic' }}>GOAL BREAKER</span>
         </h2>
+
+        {/* Canvas Name - Editable */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          marginLeft: '20px',
+          paddingLeft: '20px',
+          borderLeft: '2px solid #e5e7eb'
+        }}>
+          {isEditingCanvasName ? (
+            <input
+              type="text"
+              value={editedCanvasName}
+              onChange={(e) => setEditedCanvasName(e.target.value)}
+              onBlur={() => {
+                if (editedCanvasName.trim()) {
+                  handleRenameCanvas(currentCanvasId, editedCanvasName.trim());
+                }
+                setIsEditingCanvasName(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                } else if (e.key === 'Escape') {
+                  setIsEditingCanvasName(false);
+                }
+              }}
+              autoFocus
+              style={{
+                padding: '6px 12px',
+                border: '2px solid #8b5cf6',
+                borderRadius: '4px',
+                fontSize: '16px',
+                fontWeight: '600',
+                outline: 'none',
+                minWidth: '200px'
+              }}
+            />
+          ) : (
+            <div
+              onClick={() => {
+                setEditedCanvasName(getCurrentCanvasName());
+                setIsEditingCanvasName(true);
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#374151',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s',
+                border: '2px solid transparent'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                e.currentTarget.style.borderColor = '#d1d5db';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
+              title="Click to rename canvas"
+            >
+              {getCurrentCanvasName()}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Canvas Menu Overlay */}
@@ -874,7 +1026,7 @@ setCanvasList(list);
       />
 
       {/* Canvas area with positioned goals - WITH PANNING */}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', paddingTop: '80px' }}>
         {/* Fixed PPT-Style Rulers - Don't move with pan */}
         {showDebugGrid && (
           <>
@@ -1013,6 +1165,7 @@ setCanvasList(list);
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
         onMouseDown={handleCanvasMouseDown}
+        onWheel={handleWheel}
         onClick={handleCanvasClick}
       >
         {/* Panning Container */}
@@ -1120,6 +1273,7 @@ setCanvasList(list);
               selectedGoalId={selectedGoalId}
               onToggleComplete={toggleComplete}
               onDelete={deleteGoal}
+              onSetPriority={setPriority}
             />
           )}
         </div>

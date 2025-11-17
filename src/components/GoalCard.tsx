@@ -7,6 +7,7 @@ interface SimpleGoal {
   position: { x: number; y: number };
   completed?: boolean;
   isPlaceholder?: boolean;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 interface GoalCardProps {
@@ -105,6 +106,27 @@ const GoalCard: React.FC<GoalCardProps> = ({
           cursor: 'pointer'
         }}
       >
+        {/* Priority Badge */}
+        {goal.priority && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: 
+                goal.priority === 'high' ? '#EF4444' : 
+                goal.priority === 'medium' ? '#F59E0B' : 
+                '#9CA3AF',
+              border: '1px solid rgba(0,0,0,0.1)',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}
+            title={`Priority: ${goal.priority}`}
+          />
+        )}
+        
         <div
           ref={contentRef}
           contentEditable="true"
@@ -179,6 +201,27 @@ const GoalCard: React.FC<GoalCardProps> = ({
         >
           {/* Content is managed by ref in useEffect - no children needed */}
         </div>
+
+        {/* Priority Badge - Top Right Corner */}
+        {goal.priority && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: 
+                goal.priority === 'high' ? '#EF4444' :   // Red
+                goal.priority === 'medium' ? '#F59E0B' : // Amber
+                '#9CA3AF',                                // Grey (low)
+              border: '1px solid rgba(0,0,0,0.1)',
+              pointerEvents: 'none' // Don't interfere with card clicks
+            }}
+            title={`Priority: ${goal.priority}`}
+          />
+        )}
       </div>
 
       {/* Add Child button - below card */}

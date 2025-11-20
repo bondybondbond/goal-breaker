@@ -733,7 +733,7 @@ setCanvasList(list);
   };
 
   // Delete a goal and all its children
-  const deleteGoal = (goalId: number) => {
+  const deleteGoal = (goalId: number, silent: boolean = false) => {
     const goalToDelete = goals.find(g => g.id === goalId);
     if (!goalToDelete) return;
 
@@ -742,8 +742,8 @@ setCanvasList(list);
       return; // Can't delete main goal
     }
 
-    // Confirmation dialog
-    if (!window.confirm("Delete this goal and all its sub-goals?")) {
+    // Confirmation dialog (unless silent)
+    if (!silent && !window.confirm("Delete this goal and all its sub-goals?")) {
       return; // User cancelled
     }
 
@@ -1263,6 +1263,7 @@ setCanvasList(list);
               onTextChange={updateGoalText}
               onAddChild={addChild}
               onAddSibling={addSibling}
+              onDelete={deleteGoal}
             />
           ))}
           

@@ -18,6 +18,7 @@ interface GoalCardProps {
   onTextChange: (goalId: number, newText: string) => void;
   onAddChild: (goalId: number) => void;
   onAddSibling: (goalId: number) => void;
+  onDelete: (goalId: number, silent?: boolean) => void;
 }
 
 const GoalCard: React.FC<GoalCardProps> = ({
@@ -27,7 +28,8 @@ const GoalCard: React.FC<GoalCardProps> = ({
   onCardClick,
   onTextChange,
   onAddChild,
-  onAddSibling
+  onAddSibling,
+  onDelete
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   
@@ -42,7 +44,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
         .replace(/>/g, '&gt;');
       contentRef.current.innerHTML = escapedText;
     }
-  }, [goal.id, goal.text]); // Update when goal changes or text changes externally // Update when goal changes or text changes externally // Update when goal changes or text changes externally // Update when goal changes or text changes externally // Update when goal changes or text changes externally
+  }, [goal.id, goal.text]); // Update when goal changes or text changes externally
   
   // Calculate goal level for styling
   const calculateLevel = (g: SimpleGoal): number => {
@@ -84,6 +86,19 @@ const GoalCard: React.FC<GoalCardProps> = ({
   const bgColor = goal.completed 
     ? '#c8e6c9'  // Green when completed
     : 'white';   // White by default
+
+  // Auto-focus newly created placeholder goals
+  useEffect(() => {
+    if (goal.isPlaceholder && isSelected && contentRef.current) {
+      contentRef.current.focus();
+      // Select all text for easy replacement
+      const range = document.createRange();
+      range.selectNodeContents(contentRef.current);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+  }, [goal.isPlaceholder, isSelected]);
 
   return (
     <>
@@ -161,13 +176,29 @@ const GoalCard: React.FC<GoalCardProps> = ({
             }
           }}
           onBlur={(e) => {
-            // Restore placeholder if left empty
             const text = e.currentTarget.textContent?.trim() || '';
-            if (text === '') {
-              onTextChange(
-                goal.id, 
-                !goal.parentId ? 'What\'s your main goal?' : 'New sub-goal'
-              );
+            
+            // If empty and it's a sub-goal (has parent), delete it silently
+            if (text === '' && goal.parentId) {
+              onDelete(goal.id, true); // true = silent delete
+              return;
+            }
+
+            // If text is still a placeholder text (regardless of isPlaceholder flag), delete it
+            // This catches cases where user clicked but never actually typed anything
+            const isUnchangedPlaceholder = 
+              text === 'New sub-goal' || 
+              text === 'New sibling goal' ||
+              text === "What's your main goal?";
+            
+            if (isUnchangedPlaceholder && goal.parentId) {
+              onDelete(goal.id, true); // Silent delete
+              return;
+            }
+            
+            // Otherwise, restore placeholder if left empty (only for main goal now)
+            if (text === '' && !goal.parentId) {
+              onTextChange(goal.id, 'What\'s your main goal?');
             }
           }}
           onMouseDown={(e) => {
